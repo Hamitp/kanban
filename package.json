@@ -1,6 +1,6 @@
 {
   "name": "akis-local-workspace",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Yerel çalışan Kanban ve mind map masaüstü uygulaması",
   "author": "Hamit Parlak",
   "main": "desktop/electron/main.cjs",

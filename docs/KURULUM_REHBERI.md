@@ -43,7 +43,7 @@ GitHub hesabınızın olması gerekmez.
 Sürüm sayfasındaki **Assets** bölümünü açın. Aşağıdakine benzeyen dosyaya tıklayın:
 
 ```text
-Akis-Setup-0.1.0-x64.exe
+Akis-Setup-...-x64.exe
 ```
 
 Sürüm numarası zamanla değişebilir. Örneğin gelecekte dosyanın adı `Akis-Setup-0.2.0-x64.exe` olabilir. Önemli olan dosya adının:
@@ -251,4 +251,3 @@ Teknik terimler kullanmanız gerekmez.
 - En güncel Windows sürümü: [github.com/Hamitp/kanban/releases/latest](https://github.com/Hamitp/kanban/releases/latest)
 - Kurulum rehberi: [docs/KURULUM_REHBERI.md](https://github.com/Hamitp/kanban/blob/main/docs/KURULUM_REHBERI.md)
 - Hata ve öneriler: [github.com/Hamitp/kanban/issues](https://github.com/Hamitp/kanban/issues)
-

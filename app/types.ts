@@ -60,6 +60,7 @@ export interface KanbanBoard {
   description: string;
   columns: BoardColumn[];
   tasks: Record<string, TaskCard>;
+  zoom?: number;
   archived: boolean;
   createdAt: string;
   updatedAt: string;
@@ -83,6 +84,7 @@ export interface MindMap {
   title: string;
   description: string;
   nodes: MindNode[];
+  zoom?: number;
   archived: boolean;
   createdAt: string;
   updatedAt: string;

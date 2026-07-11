@@ -383,6 +383,7 @@ export default function AkisApp() {
 
         {currentBoard && (
           <BoardView
+            key={currentBoard.id}
             board={currentBoard}
             projectName={data.projects.find((project) => project.id === currentBoard.projectId)?.name ?? "Proje"}
             members={data.members}
@@ -521,11 +522,23 @@ export default function AkisApp() {
               }))
             }
             onAddLabel={addGlobalLabel}
+            onZoomChange={(zoom) =>
+              commit(
+                (current) => ({
+                  ...current,
+                  boards: current.boards.map((board) =>
+                    board.id === currentBoard.id ? { ...board, zoom } : board,
+                  ),
+                }),
+                false,
+              )
+            }
           />
         )}
 
         {currentMap && (
           <MindMapView
+            key={currentMap.id}
             map={currentMap}
             projectName={data.projects.find((project) => project.id === currentMap.projectId)?.name ?? "Proje"}
             onBack={() => navigate({ kind: "project", id: currentMap.projectId })}
@@ -629,6 +642,17 @@ export default function AkisApp() {
               }));
               showToast("Harita otomatik düzenlendi", true);
             }}
+            onZoomChange={(zoom) =>
+              commit(
+                (current) => ({
+                  ...current,
+                  mindMaps: current.mindMaps.map((map) =>
+                    map.id === currentMap.id ? { ...map, zoom } : map,
+                  ),
+                }),
+                false,
+              )
+            }
           />
         )}
 

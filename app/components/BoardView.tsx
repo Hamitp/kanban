@@ -19,7 +19,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { newId } from "../seed";
 import { getTaskWorkMs, getTaskWorkDays } from "../taskTiming";
 import type {
@@ -30,6 +30,8 @@ import type {
   Priority,
   TaskCard,
 } from "../types";
+import { CanvasZoomControls } from "./CanvasZoomControls";
+import { useCanvasZoom } from "./useCanvasZoom";
 
 interface BoardViewProps {
   board: KanbanBoard;
@@ -53,6 +55,7 @@ interface BoardViewProps {
     beforeTaskId?: string,
   ) => void;
   onAddLabel: (name: string, color: string) => string;
+  onZoomChange: (zoom: number) => void;
 }
 
 const priorityNames: Record<Priority, string> = {
@@ -81,6 +84,7 @@ export function BoardView({
   onDeleteTask,
   onMoveTask,
   onAddLabel,
+  onZoomChange,
 }: BoardViewProps) {
   const [clock, setClock] = useState(() => Date.now());
   const [query, setQuery] = useState("");
@@ -92,6 +96,21 @@ export function BoardView({
   } | null>(null);
   const [columnEditor, setColumnEditor] = useState<BoardColumn | "new" | null>(null);
   const [boardEditor, setBoardEditor] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const {
+    zoom,
+    zoomIn,
+    zoomOut,
+    resetZoom,
+    isMinZoom,
+    isMaxZoom,
+  } = useCanvasZoom({
+    initialZoom: board.zoom ?? 1,
+    minZoom: 0.65,
+    maxZoom: 1.6,
+    scrollRef,
+    onZoomChange,
+  });
 
   useEffect(() => {
     const timer = window.setInterval(() => setClock(Date.now()), 60_000);
@@ -181,6 +200,15 @@ export function BoardView({
         >
           <CircleAlert size={15} /> Bekleyenler
         </button>
+        <CanvasZoomControls
+          label="Kanban board"
+          zoom={zoom}
+          onZoomIn={zoomIn}
+          onZoomOut={zoomOut}
+          onReset={resetZoom}
+          isMinZoom={isMinZoom}
+          isMaxZoom={isMaxZoom}
+        />
         <div className="board-progress" aria-label={`${total} işten ${completed} tanesi tamamlandı`}>
           <span>{completed}/{total || 0} tamamlandı</span>
           <div className="progress-track">
@@ -189,8 +217,12 @@ export function BoardView({
         </div>
       </div>
 
-      <main className="kanban-scroll" aria-label={`${board.title} Kanban board`}>
-        <div className="kanban-grid">
+      <main
+        className="kanban-scroll"
+        ref={scrollRef}
+        aria-label={`${board.title} Kanban board`}
+      >
+        <div className="kanban-grid" style={{ zoom } as React.CSSProperties}>
           {board.columns.map((column, columnIndex) => {
             const taskIds = column.taskIds.filter((id) => visibleTaskIds.has(id));
             return (

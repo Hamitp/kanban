@@ -15,13 +15,15 @@ import {
   Plus,
   Sparkles,
   Trash2,
-  ZoomIn,
-  ZoomOut,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { MindMap, MindNode } from "../types";
+import { CanvasZoomControls } from "./CanvasZoomControls";
+import { useCanvasZoom } from "./useCanvasZoom";
 
 const nodeColors = ["violet", "coral", "sage", "blue", "amber"];
+const nodeWidth = 202;
+const nodeHeight = 78;
 
 interface MindMapViewProps {
   map: MindMap;
@@ -35,6 +37,7 @@ interface MindMapViewProps {
   onMoveNode: (nodeId: string, x: number, y: number) => void;
   onDeleteNode: (nodeId: string) => void;
   onAutoLayout: () => void;
+  onZoomChange: (zoom: number) => void;
 }
 
 export function MindMapView({
@@ -49,12 +52,26 @@ export function MindMapView({
   onMoveNode,
   onDeleteNode,
   onAutoLayout,
+  onZoomChange,
 }: MindMapViewProps) {
   const [selectedId, setSelectedId] = useState(map.nodes[0]?.id);
-  const [zoom, setZoom] = useState(0.9);
   const [outlineOpen, setOutlineOpen] = useState(true);
   const [editingTitle, setEditingTitle] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const {
+    zoom,
+    zoomIn,
+    zoomOut,
+    resetZoom,
+    isMinZoom,
+    isMaxZoom,
+  } = useCanvasZoom({
+    initialZoom: map.zoom ?? 1,
+    minZoom: 0.5,
+    maxZoom: 1.8,
+    scrollRef,
+    onZoomChange,
+  });
   const [drag, setDrag] = useState<{
     id: string;
     startX: number;
@@ -118,8 +135,8 @@ export function MindMapView({
     const container = scrollRef.current;
     if (!container || !root) return;
     container.scrollTo({
-      left: Math.max(0, root.x * zoom - container.clientWidth / 2 + 90),
-      top: Math.max(0, root.y * zoom - container.clientHeight / 2 + 40),
+      left: Math.max(0, (root.x + nodeWidth / 2) * zoom - container.clientWidth / 2),
+      top: Math.max(0, (root.y + nodeHeight / 2) * zoom - container.clientHeight / 2),
       behavior: "smooth",
     });
   }
@@ -176,13 +193,15 @@ export function MindMapView({
           <GitBranch size={16} /> Kardeş fikir
         </button>
         <span className="toolbar-divider" />
-        <button className="icon-button" onClick={() => setZoom((value) => Math.max(0.55, value - 0.1))} aria-label="Uzaklaştır">
-          <ZoomOut size={17} />
-        </button>
-        <span className="zoom-value">%{Math.round(zoom * 100)}</span>
-        <button className="icon-button" onClick={() => setZoom((value) => Math.min(1.4, value + 0.1))} aria-label="Yakınlaştır">
-          <ZoomIn size={17} />
-        </button>
+        <CanvasZoomControls
+          label="Mind map"
+          zoom={zoom}
+          onZoomIn={zoomIn}
+          onZoomOut={zoomOut}
+          onReset={resetZoom}
+          isMinZoom={isMinZoom}
+          isMaxZoom={isMaxZoom}
+        />
         <button className="tool-button" onClick={centerMap}><Focus size={16} /> Merkezle</button>
         <button className="tool-button" onClick={onAutoLayout}><LayoutGrid size={16} /> Otomatik düzen</button>
         <div className="spacer" />
@@ -221,10 +240,10 @@ export function MindMapView({
                   .map((node) => {
                     const parent = displayNodes.find((candidate) => candidate.id === node.parentId);
                     if (!parent) return null;
-                    const fromX = parent.x + 92;
-                    const fromY = parent.y + 35;
-                    const toX = node.x + 92;
-                    const toY = node.y + 35;
+                    const fromX = parent.x + nodeWidth / 2;
+                    const fromY = parent.y + nodeHeight / 2;
+                    const toX = node.x + nodeWidth / 2;
+                    const toY = node.y + nodeHeight / 2;
                     const bend = Math.max(50, Math.abs(toX - fromX) * 0.45);
                     const direction = toX >= fromX ? 1 : -1;
                     return (
@@ -328,4 +347,3 @@ function NodeInspector({ node, onUpdate, onDelete }: { node: MindNode; onUpdate:
     </aside>
   );
 }
-

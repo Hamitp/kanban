@@ -17,7 +17,7 @@ Kod indirmeniz veya geliştirici araçları kurmanız gerekmez:
 
 ## Kısa kurulum özeti
 
-1. `Akis-Setup-0.1.0-x64.exe` kurulum dosyasını bir kez çalıştırın.
+1. `Akis-Setup-...-x64.exe` kurulum dosyasını bir kez çalıştırın.
 2. Kurulumdan sonra masaüstündeki **Akış** kısayoluna çift tıklayın.
 3. Tarayıcı, PowerShell veya başka bir geliştirme aracı açmanız gerekmez.
 
@@ -33,6 +33,8 @@ Saatlik güvenlik kopyaları `Belgeler\Akış\Save\Backups` altında otomatik tu
 
 - Proje altında birden fazla Kanban board ve mind map
 - Özelleştirilebilir sütunlar ve sürükle-bırak görev akışı
+- Kanban ve mind map alanlarında düğmelerle veya `Ctrl + fare tekerleği` ile yakınlaştırma
+- Daha rahat okunabilen arayüz yazıları ve her çalışma alanı için kaydedilen yakınlaştırma seviyesi
 - Etiketler, bekleme/engel nedeni, son tarih ve çoklu kişi ataması
 - Görev çalışma süresi ve proje ilerleme analitiği
 - Mind map üzerinde fikir ekleme, taşıma, renklendirme ve otomatik düzen

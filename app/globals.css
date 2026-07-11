@@ -130,7 +130,7 @@ body {
   background: var(--canvas);
   color: var(--text);
   font-family: "Segoe UI Variable", "Segoe UI", Aptos, system-ui, -apple-system, sans-serif;
-  font-size: 14px;
+  font-size: 15px;
   text-rendering: optimizeLegibility;
 }
 
@@ -265,7 +265,7 @@ select:focus-visible {
 
 .brand-button small {
   color: var(--text-faint);
-  font-size: 10px;
+  font-size: 11.5px;
   white-space: nowrap;
 }
 
@@ -352,7 +352,7 @@ select:focus-visible {
   justify-content: space-between;
   padding: 0 9px 7px;
   color: var(--text-faint);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.1em;
 }
@@ -376,7 +376,7 @@ select:focus-visible {
   background: transparent;
   color: var(--text-soft);
   text-align: left;
-  font-size: 12.5px;
+  font-size: 13.5px;
 }
 
 .sidebar-projects > button:hover,
@@ -435,7 +435,7 @@ select:focus-visible {
   align-items: center;
   gap: 6px;
   color: var(--text-faint);
-  font-size: 11.5px;
+  font-size: 12.5px;
 }
 
 .breadcrumb strong {
@@ -478,7 +478,7 @@ select:focus-visible {
   outline: 0;
   background: transparent;
   color: var(--text);
-  font-size: 12.5px;
+  font-size: 13.5px;
 }
 
 .global-search kbd {
@@ -508,7 +508,7 @@ select:focus-visible {
   justify-content: space-between;
   padding: 5px 7px 9px;
   color: var(--text-faint);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .search-popover header button {
@@ -541,13 +541,13 @@ select:focus-visible {
 }
 
 .search-popover > button strong {
-  font-size: 12.5px;
+  font-size: 13.5px;
 }
 
 .search-popover > button small,
 .empty-search {
   color: var(--text-faint);
-  font-size: 10.5px;
+  font-size: 11.5px;
 }
 
 .empty-search {
@@ -569,7 +569,7 @@ select:focus-visible {
   gap: 6px;
   margin-right: 4px;
   color: var(--text-faint);
-  font-size: 10.5px;
+  font-size: 11.5px;
   white-space: nowrap;
 }
 
@@ -652,7 +652,7 @@ select:focus-visible {
   gap: 7px;
   border-radius: 9px;
   padding: 0 12px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 650;
   white-space: nowrap;
 }
@@ -714,7 +714,7 @@ select:focus-visible {
 
 .eyebrow {
   color: var(--text-faint);
-  font-size: 9.5px;
+  font-size: 10.5px;
   font-weight: 750;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -805,7 +805,7 @@ select:focus-visible {
 .metric-card span {
   grid-column: 1;
   color: var(--text-soft);
-  font-size: 10.5px;
+  font-size: 12px;
 }
 
 .metric-card strong {
@@ -819,7 +819,7 @@ select:focus-visible {
   grid-row: 1 / 3;
   align-self: end;
   color: var(--text-faint);
-  font-size: 9.5px;
+  font-size: 11px;
   text-align: right;
 }
 
@@ -907,7 +907,7 @@ select:focus-visible {
 .progress-ring span {
   position: relative;
   z-index: 1;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 750;
 }
 
@@ -927,13 +927,13 @@ select:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12.5px;
+  font-size: 13.5px;
 }
 
 .health-title span {
   margin-left: auto;
   color: var(--text-faint);
-  font-size: 9.5px;
+  font-size: 11px;
 }
 
 .segmented-progress {
@@ -961,7 +961,7 @@ select:focus-visible {
   align-items: center;
   gap: 12px;
   color: var(--text-faint);
-  font-size: 9px;
+  font-size: 10.5px;
 }
 
 .health-legend span {
@@ -994,11 +994,11 @@ select:focus-visible {
 
 .cycle-mini span {
   color: var(--text-faint);
-  font-size: 9px;
+  font-size: 10.5px;
 }
 
 .cycle-mini strong {
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .quick-capture-card {
@@ -1027,7 +1027,7 @@ select:focus-visible {
 .quick-capture-card p {
   margin: 0 0 14px;
   color: var(--text-soft);
-  font-size: 11px;
+  font-size: 12.5px;
   line-height: 1.5;
 }
 
@@ -1047,7 +1047,7 @@ select:focus-visible {
   display: block;
   margin-top: 8px;
   color: var(--text-faint);
-  font-size: 9.5px;
+  font-size: 11px;
   text-align: center;
 }
 
@@ -1060,7 +1060,7 @@ select:focus-visible {
   border-radius: 8px;
   background: var(--accent-soft);
   color: var(--accent-text);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
 }
 
@@ -1110,13 +1110,13 @@ select:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: 13.5px;
 }
 
 .focus-copy small,
 .waiting-list small {
   color: var(--text-faint);
-  font-size: 9.5px;
+  font-size: 11px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1127,7 +1127,7 @@ select:focus-visible {
   border-radius: 7px;
   color: var(--success);
   background: var(--success-soft);
-  font-size: 9px;
+  font-size: 10.5px;
   font-weight: 650;
   white-space: nowrap;
 }
@@ -1170,13 +1170,13 @@ select:focus-visible {
 
 .empty-state strong {
   color: var(--text-soft);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .empty-state p {
   max-width: 310px;
   margin: 0;
-  font-size: 10px;
+  font-size: 11.5px;
 }
 
 .page-header {
@@ -1252,7 +1252,7 @@ select:focus-visible {
   margin: 0;
   min-height: 34px;
   color: var(--text-soft);
-  font-size: 11px;
+  font-size: 12.5px;
   line-height: 1.5;
 }
 
@@ -1265,12 +1265,12 @@ select:focus-visible {
 
 .project-card-progress > span {
   color: var(--text-faint);
-  font-size: 9.5px;
+  font-size: 11px;
 }
 
 .project-card-progress strong {
   color: var(--text);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .project-card-progress > div {
@@ -1292,7 +1292,7 @@ select:focus-visible {
   gap: 12px;
   margin-top: 10px;
   color: var(--text-faint);
-  font-size: 9px;
+  font-size: 10.5px;
 }
 
 .project-hero {
@@ -1342,7 +1342,7 @@ select:focus-visible {
   background: transparent;
   color: var(--text-soft);
   padding: 0 8px;
-  font-size: 11px;
+  font-size: 12.5px;
 }
 
 .context-menu button:hover {
@@ -1356,7 +1356,7 @@ select:focus-visible {
   margin-bottom: 28px;
   padding: 11px 16px;
   color: var(--text-soft);
-  font-size: 11px;
+  font-size: 12.5px;
 }
 
 .project-summary-strip span {
@@ -1424,7 +1424,7 @@ select:focus-visible {
   align-items: center;
   gap: 5px;
   color: var(--text-faint);
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.1em;
 }
@@ -1469,7 +1469,7 @@ select:focus-visible {
   align-items: center;
   gap: 6px;
   color: var(--text-faint);
-  font-size: 9px;
+  font-size: 10.5px;
 }
 
 .asset-copy h3 {
@@ -1481,7 +1481,7 @@ select:focus-visible {
   min-height: 30px;
   margin: 0;
   color: var(--text-soft);
-  font-size: 10px;
+  font-size: 11.5px;
   line-height: 1.45;
 }
 
@@ -1490,7 +1490,7 @@ select:focus-visible {
   gap: 10px;
   padding: 7px 15px 13px;
   color: var(--text-faint);
-  font-size: 9px;
+  font-size: 10.5px;
 }
 
 .asset-main footer .updated {
@@ -1528,7 +1528,7 @@ select:focus-visible {
 
 .create-card small {
   color: var(--text-faint);
-  font-size: 9px;
+  font-size: 10.5px;
 }
 
 .archive-notice {
@@ -1549,7 +1549,7 @@ select:focus-visible {
 }
 
 .archive-notice span {
-  font-size: 10px;
+  font-size: 11.5px;
 }
 
 .archive-list {
@@ -1586,12 +1586,12 @@ select:focus-visible {
 .archive-list p {
   margin: 3px 0;
   color: var(--text-soft);
-  font-size: 10px;
+  font-size: 11.5px;
 }
 
 .archive-list small {
   color: var(--text-faint);
-  font-size: 9px;
+  font-size: 10.5px;
 }
 
 .settings-page {
@@ -1616,7 +1616,7 @@ select:focus-visible {
 .settings-heading p {
   margin: 0;
   color: var(--text-soft);
-  font-size: 10px;
+  font-size: 11.5px;
   line-height: 1.5;
 }
 
@@ -1698,8 +1698,8 @@ select:focus-visible {
   display: grid;
 }
 
-.theme-card strong { font-size: 10.5px; }
-.theme-card small { color: var(--text-faint); font-size: 8.5px; }
+.theme-card strong { font-size: 12px; }
+.theme-card small { color: var(--text-faint); font-size: 10.5px; }
 
 .members-header {
   display: flex;
@@ -1707,7 +1707,7 @@ select:focus-visible {
   justify-content: space-between;
   padding-bottom: 12px;
   color: var(--text-soft);
-  font-size: 11px;
+  font-size: 12.5px;
 }
 
 .settings-members {
@@ -1732,8 +1732,8 @@ select:focus-visible {
   gap: 2px;
 }
 
-.settings-members strong { font-size: 11px; }
-.settings-members small { color: var(--text-faint); font-size: 9px; }
+.settings-members strong { font-size: 12.5px; }
+.settings-members small { color: var(--text-faint); font-size: 10.5px; }
 
 .backup-panel {
   display: grid;
@@ -1757,8 +1757,8 @@ select:focus-visible {
   gap: 3px;
 }
 
-.backup-panel strong { font-size: 11px; }
-.backup-panel small { color: var(--text-faint); font-size: 9px; }
+.backup-panel strong { font-size: 12.5px; }
+.backup-panel small { color: var(--text-faint); font-size: 10.5px; }
 
 .backup-panel.automatic > div:first-child {
   color: var(--success);
@@ -1779,7 +1779,7 @@ select:focus-visible {
   gap: 5px;
   padding: 0 8px;
   border-radius: 8px;
-  font-size: 9px;
+  font-size: 10.5px;
   font-weight: 700;
 }
 
@@ -1868,7 +1868,7 @@ select:focus-visible {
 .work-heading p {
   margin: 0;
   color: var(--text-soft);
-  font-size: 10.5px;
+  font-size: 12px;
 }
 
 .title-button {
@@ -1933,7 +1933,7 @@ select:focus-visible {
   gap: 9px;
   margin-left: auto;
   color: var(--text-soft);
-  font-size: 9.5px;
+  font-size: 11px;
 }
 
 .progress-track {
@@ -1955,6 +1955,7 @@ select:focus-visible {
   min-width: 0;
   min-height: 0;
   overflow: auto;
+  overscroll-behavior: contain;
   padding: 16px 20px 28px;
   background:
     linear-gradient(90deg, var(--grid) 1px, transparent 1px),
@@ -1971,8 +1972,8 @@ select:focus-visible {
 }
 
 .kanban-column {
-  width: 304px;
-  flex: 0 0 304px;
+  width: 328px;
+  flex: 0 0 328px;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -2006,13 +2007,13 @@ select:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 13px;
+  font-size: 14.5px;
   letter-spacing: -0.01em;
 }
 
 .column-header span {
   color: var(--text-faint);
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .column-actions {
@@ -2074,7 +2075,7 @@ select:focus-visible {
   gap: 5px;
   margin-bottom: 7px;
   color: var(--text-faint);
-  font-size: 8px;
+  font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -2098,7 +2099,7 @@ select:focus-visible {
 .task-card h3 {
   margin: 0;
   color: var(--text);
-  font-size: 12.5px;
+  font-size: 14.5px;
   line-height: 1.42;
   font-weight: 650;
 }
@@ -2112,7 +2113,7 @@ select:focus-visible {
   border-radius: 7px;
   color: var(--warning);
   background: var(--warning-soft);
-  font-size: 8.5px;
+  font-size: 11px;
   line-height: 1.35;
 }
 
@@ -2132,7 +2133,7 @@ select:focus-visible {
   border-radius: 5px;
   background: color-mix(in srgb, var(--label-color) 14%, transparent);
   color: var(--label-color);
-  font-size: 8px;
+  font-size: 10.5px;
   font-weight: 650;
 }
 
@@ -2160,7 +2161,7 @@ select:focus-visible {
   border: 2px solid var(--surface-raised);
   border-radius: 50%;
   color: white;
-  font-size: 6.5px;
+  font-size: 8.5px;
   font-weight: 700;
 }
 
@@ -2171,7 +2172,7 @@ select:focus-visible {
   display: flex;
   align-items: center;
   gap: 3px;
-  font-size: 8px;
+  font-size: 10.5px;
 }
 
 .task-age {
@@ -2193,7 +2194,7 @@ select:focus-visible {
   border-radius: 8px;
   background: transparent;
   color: var(--text-faint);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .add-task-button:hover {
@@ -2206,7 +2207,7 @@ select:focus-visible {
   padding: 22px 10px;
   color: var(--text-faint);
   text-align: center;
-  font-size: 9px;
+  font-size: 11.5px;
 }
 
 .add-column-card {
@@ -2221,7 +2222,7 @@ select:focus-visible {
   border-radius: 11px;
   background: color-mix(in srgb, var(--surface) 55%, transparent);
   color: var(--text-soft);
-  font-size: 11px;
+  font-size: 12.5px;
 }
 
 .panel-scrim,
@@ -2284,7 +2285,7 @@ select:focus-visible {
   display: grid;
   gap: 7px;
   color: var(--text-soft);
-  font-size: 10.5px;
+  font-size: 12.5px;
   font-weight: 650;
 }
 
@@ -2300,7 +2301,7 @@ select:focus-visible {
   outline: 0;
   background: var(--surface);
   color: var(--text);
-  font-size: 11.5px;
+  font-size: 13.5px;
   font-weight: 450;
 }
 
@@ -2312,7 +2313,7 @@ select:focus-visible {
 .field-help {
   margin-top: -3px;
   color: var(--text-faint);
-  font-size: 8.5px;
+  font-size: 10.5px;
   font-weight: 450;
 }
 
@@ -2359,7 +2360,7 @@ select:focus-visible {
   gap: 6px;
   margin-bottom: 9px;
   color: var(--text-soft);
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 650;
 }
 
@@ -2377,7 +2378,7 @@ select:focus-visible {
   border: 1px solid var(--border);
   border-radius: 8px;
   color: var(--text-soft);
-  font-size: 9px;
+  font-size: 11px;
   cursor: pointer;
 }
 
@@ -2412,7 +2413,7 @@ select:focus-visible {
   border: 1px solid var(--border);
   border-radius: 9px;
   color: var(--text-soft);
-  font-size: 9.5px;
+  font-size: 11.5px;
   cursor: pointer;
 }
 
@@ -2425,7 +2426,7 @@ select:focus-visible {
 .member-choice-list .member-avatar {
   width: 26px;
   height: 26px;
-  font-size: 8px;
+  font-size: 10px;
 }
 
 .modal-scrim {
@@ -2536,8 +2537,8 @@ select:focus-visible {
   gap: 2px;
 }
 
-.copy-options strong { font-size: 11px; }
-.copy-options small { color: var(--text-faint); font-size: 9px; }
+.copy-options strong { font-size: 12.5px; }
+.copy-options small { color: var(--text-faint); font-size: 10.5px; }
 
 .map-toolbar {
   min-height: 44px;
@@ -2551,11 +2552,47 @@ select:focus-visible {
   background: var(--border);
 }
 
+.canvas-zoom-controls {
+  flex: 0 0 auto;
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.canvas-zoom-controls .icon-button {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+}
+
 .zoom-value {
-  min-width: 38px;
-  color: var(--text-faint);
-  font-size: 9px;
+  min-width: 50px;
+  height: 28px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--surface-muted);
+  color: var(--text-soft);
+  font-size: 11.5px;
+  font-weight: 700;
   text-align: center;
+}
+
+.zoom-value:hover {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.zoom-hint {
+  margin: 0 6px 0 3px;
+  color: var(--text-faint);
+  font-size: 10.5px;
+  white-space: nowrap;
 }
 
 .map-workspace {
@@ -2582,8 +2619,8 @@ select:focus-visible {
   border-bottom: 1px solid var(--border);
 }
 
-.map-outline > header strong { font-size: 11px; }
-.map-outline > header span { margin-left: auto; color: var(--text-faint); font-size: 9px; }
+.map-outline > header strong { font-size: 12.5px; }
+.map-outline > header span { margin-left: auto; color: var(--text-faint); font-size: 10.5px; }
 
 .outline-tree {
   display: grid;
@@ -2602,7 +2639,7 @@ select:focus-visible {
   background: transparent;
   color: var(--text-soft);
   text-align: left;
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .outline-tree button:hover,
@@ -2638,6 +2675,7 @@ select:focus-visible {
   min-height: 0;
   flex: 1;
   overflow: auto;
+  overscroll-behavior: contain;
   background: var(--canvas);
 }
 
@@ -2673,8 +2711,8 @@ select:focus-visible {
 .map-edge.amber { stroke: #d89a45; }
 
 .mind-node {
-  width: 184px;
-  min-height: 70px;
+  width: 202px;
+  min-height: 78px;
   position: absolute;
   display: flex;
   flex-direction: column;
@@ -2709,12 +2747,12 @@ select:focus-visible {
 .mind-node-kicker {
   margin-bottom: 4px;
   color: var(--text-faint);
-  font-size: 7px;
+  font-size: 9.5px;
   letter-spacing: 0.12em;
 }
 
 .mind-node strong {
-  font-size: 11.5px;
+  font-size: 13.5px;
 }
 
 .mind-node small {
@@ -2724,7 +2762,7 @@ select:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--text-faint);
-  font-size: 8.5px;
+  font-size: 10.5px;
 }
 
 .canvas-hint {
@@ -2739,7 +2777,7 @@ select:focus-visible {
   border-radius: 8px;
   background: color-mix(in srgb, var(--surface) 82%, transparent);
   color: var(--text-faint);
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .node-inspector {
@@ -2786,7 +2824,7 @@ select:focus-visible {
   border-radius: 8px;
   background: var(--surface-muted);
   color: var(--text-faint);
-  font-size: 8.5px;
+  font-size: 10.5px;
 }
 
 .inline-title-input {
@@ -2880,6 +2918,7 @@ select:focus-visible {
   .project-grid,
   .asset-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .node-inspector { width: 240px; flex-basis: 240px; }
+  .zoom-hint { display: none; }
 }
 
 @media (max-width: 900px) {
