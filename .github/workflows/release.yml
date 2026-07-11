@@ -1,0 +1,63 @@
+name: Publish Windows Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    steps:
+      - name: Kaynak kodu al
+        uses: actions/checkout@v4
+
+      - name: Node.js kur
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Rust kur
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: JavaScript bağımlılıklarını kur
+        run: npm ci
+
+      - name: Bütün kalite kontrolleri
+        run: npm run check
+
+      - name: Rust kayıt testleri
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      - name: Küçük Windows kurulumunu üret
+        run: npm run desktop:dist
+
+      - name: Kurulumu adlandır ve checksum üret
+        id: package
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}" -replace '^v', ''
+          $source = Get-ChildItem "src-tauri/target/release/bundle/nsis/*.exe" | Select-Object -First 1
+          if (-not $source) { throw "NSIS kurulum dosyası bulunamadı." }
+          $target = "Akis-Setup-$version-x64.exe"
+          Copy-Item -LiteralPath $source.FullName -Destination $target
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $target).Hash.ToLowerInvariant()
+          "$hash  $target" | Set-Content -Encoding ascii "$target.sha256"
+          "installer=$target" >> $env:GITHUB_OUTPUT
+          "checksum=$target.sha256" >> $env:GITHUB_OUTPUT
+
+      - name: GitHub sürümünü yayımla
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" `
+            "${{ steps.package.outputs.installer }}" `
+            "${{ steps.package.outputs.checksum }}" `
+            --title "Akış ${{ github.ref_name }}" `
+            --generate-notes `
+            --latest

@@ -1,253 +1,182 @@
 # Akış — Windows Kurulum ve Kullanıma Başlama Rehberi
 
-Bu rehber, yazılım geliştirme veya GitHub tecrübesi olmayan kullanıcılar için hazırlanmıştır. Akış'ı kullanmak için kod yazmanız, PowerShell açmanız veya GitHub hesabı oluşturmanız gerekmez.
+Bu rehber yazılım geliştirme veya GitHub tecrübesi olmayan kullanıcılar içindir. Akış'ı kullanmak için kod yazmanız, PowerShell açmanız ya da GitHub hesabı oluşturmanız gerekmez.
 
 ## En kısa anlatım
 
-1. [Akış'ın en güncel sürüm sayfasını açın](https://github.com/Hamitp/kanban/releases/latest).
-2. `Akis-Setup-...-x64.exe` isimli kurulum dosyasını indirin.
+1. [En güncel Akış sürümünü açın](https://github.com/Hamitp/kanban/releases/latest).
+2. **Assets** bölümünden `Akis-Setup-...-x64.exe` dosyasını indirin.
 3. İndirdiğiniz dosyaya çift tıklayın.
-4. Kurulumdan sonra masaüstündeki **Akış** simgesine çift tıklayın.
+4. Kurulumdan sonra masaüstündeki veya Başlat menüsündeki **Akış** simgesine çift tıklayın.
 
-Hepsi bu kadar. Program daha sonra tarayıcı, internet bağlantısı veya PowerShell gerektirmeden çalışır.
+Hepsi bu kadar. Daha sonraki kullanımlarda tarayıcı, internet bağlantısı veya PowerShell gerekmez.
 
----
-
-## 1. Bilgisayarınızda neler olmalı?
-
-Akış'ın mevcut sürümü aşağıdaki bilgisayarlar içindir:
+## 1. Uyumlu bilgisayarlar
 
 - Windows 10 veya Windows 11
 - 64 bit işlemci
-- Yaklaşık 500 MB boş disk alanı
-- Yalnızca kurulum dosyasını indirmek için internet bağlantısı
+- Kurulum ve ortak Windows bileşenleri için en az 150 MB boş alan
+- Yalnız kurulum dosyasını indirmek için internet bağlantısı
 
-Program kurulduktan sonra Kanban boardlarınızı ve mind maplerinizi internet bağlantısı olmadan kullanabilirsiniz.
+Akış kurulduktan sonra proje, Kanban panosu ve zihin haritalarınızı internetsiz kullanabilirsiniz. Çoğu güncel Windows bilgisayarda gerekli WebView2 bileşeni zaten vardır. Yoksa küçük kurulum programı bu ortak Windows bileşenini Microsoft'tan indirir.
 
-## 2. GitHub'da doğru sayfayı açın
+## 2. Resmî indirme sayfasını açın
 
-İnternet tarayıcınızda şu adresi açın:
+Projenin resmî adresi:
 
-**[https://github.com/Hamitp/kanban](https://github.com/Hamitp/kanban)**
+**[github.com/Hamitp/kanban](https://github.com/Hamitp/kanban)**
 
-Bu sayfa projenin resmi GitHub deposudur. Sayfanın sağ tarafında veya üst bölümünde **Releases** ya da **Sürümler** bağlantısını göreceksiniz.
+Doğrudan son sürüme gitmek için:
 
-En kolay yöntem doğrudan şu bağlantıyı kullanmaktır:
+**[github.com/Hamitp/kanban/releases/latest](https://github.com/Hamitp/kanban/releases/latest)**
 
-**[En güncel Akış sürümünü aç](https://github.com/Hamitp/kanban/releases/latest)**
-
-GitHub hesabınızın olması gerekmez.
+GitHub hesabı gerekmez.
 
 ## 3. Doğru dosyayı indirin
 
-Sürüm sayfasındaki **Assets** bölümünü açın. Aşağıdakine benzeyen dosyaya tıklayın:
+Sürüm sayfasının altındaki **Assets** bölümünde şu biçimdeki dosyaya tıklayın:
 
 ```text
-Akis-Setup-...-x64.exe
+Akis-Setup-1.0.0-x64.exe
 ```
 
-Sürüm numarası zamanla değişebilir. Örneğin gelecekte dosyanın adı `Akis-Setup-0.2.0-x64.exe` olabilir. Önemli olan dosya adının:
+Sürüm numarası zamanla değişebilir. Dosya adının `Akis-Setup-` ile başlaması ve `x64.exe` ile bitmesi yeterlidir.
 
-- `Akis-Setup-` ile başlaması,
-- `x64.exe` ile bitmesidir.
-
-### Hangi dosyaları indirmemelisiniz?
-
-Programı yalnızca kullanmak istiyorsanız aşağıdaki dosyaları indirmeyin:
+Yalnız programı kullanacaksanız şunları indirmeniz gerekmez:
 
 - `Source code (zip)`
 - `Source code (tar.gz)`
-- `.blockmap` uzantılı dosyalar
-- `.sha256` uzantılı kontrol dosyası
+- `.sha256` dosyası
 
-Bunlar normal son kullanıcı kurulumu için gerekli değildir.
+`.sha256` dosyası yalnız ileri düzey bütünlük kontrolü içindir.
 
-## 4. İndirilen kurulum dosyasını bulun
+## 4. Kurulumu çalıştırın
 
-Tarayıcınız dosyayı genellikle Windows'un **İndirilenler** klasörüne kaydeder.
+1. Windows **İndirilenler** klasörünü açın.
+2. `Akis-Setup-...-x64.exe` dosyasını bulun.
+3. Dosyaya çift tıklayın.
+4. Kurulum tamamlanana kadar ekrandaki kısa adımları izleyin.
 
-1. Dosya Gezgini'ni açın.
-2. Sol menüden **İndirilenler** klasörüne girin.
-3. `Akis-Setup-...-x64.exe` dosyasını bulun.
-4. Dosyaya çift tıklayın.
+Kurulum mevcut Windows kullanıcısı için yapılır; normal koşullarda yönetici parolası istemez. Node.js, Git, Rust veya başka geliştirici programları kurmaz.
 
-Tarayıcınız ekranın üstünde veya altında indirme bildirimi gösteriyorsa dosyayı doğrudan bu bildirimin içinden de açabilirsiniz.
+## 5. Windows SmartScreen uyarısı gösterirse
 
-## 5. Windows güvenlik uyarısı gösterirse
+Akış açık kaynaklıdır; ancak kurulum henüz ücretli bir ticari kod imzalama sertifikasıyla imzalanmamıştır. Windows ilk kurulumda “Windows bilgisayarınızı korudu” uyarısı gösterebilir.
 
-Akış açık kaynaklıdır fakat mevcut kurulum dosyası henüz ticari bir kod imzalama sertifikasıyla imzalanmamıştır. Bu nedenle Windows ilk açılışta aşağıdakine benzer bir mesaj gösterebilir:
+Dosyayı yukarıdaki resmî GitHub sayfasından indirdiyseniz:
 
-```text
-Windows bilgisayarınızı korudu
-Microsoft Defender SmartScreen tanınmayan bir uygulamanın başlamasını engelledi.
-```
+1. **Ek bilgi** seçeneğine tıklayın.
+2. Dosya adının `Akis-Setup-...-x64.exe` olduğunu doğrulayın.
+3. **Yine de çalıştır** seçeneğine tıklayın.
 
-Dosyayı bu rehberdeki resmi GitHub sürüm sayfasından indirdiyseniz:
+Kurulumu e-posta eki veya tanımadığınız bir internet sitesinden indirmeyin.
 
-1. **Ek bilgi** düğmesine tıklayın.
-2. Dosya adının `Akis-Setup-...-x64.exe` olduğunu kontrol edin.
-3. **Yine de çalıştır** düğmesine tıklayın.
+## 6. Programı her gün nasıl açacaksınız?
 
-Kurulum dosyasını e-posta eki, mesajlaşma uygulaması veya tanımadığınız başka bir internet sitesinden indirmeyin.
+- Masaüstündeki **Akış** simgesine çift tıklayın; veya
+- Windows Başlat menüsünde `Akış` aratıp uygulamaya tıklayın.
 
-## 6. Kurulumu tamamlayın
+İkinci kez yanlışlıkla simgeye tıklarsanız ayrı bir veri yazıcısı açılmaz; mevcut Akış penceresi öne gelir.
 
-Akış tek tıklamalı bir kurulum kullanır:
+## 7. Kayıt için sizin yapmanız gereken var mı?
 
-1. Kurulum dosyasını çalıştırın.
-2. Kısa bir kurulum ilerleme ekranı görebilirsiniz.
-3. Akış bilgisayarınıza otomatik olarak kurulur.
-4. Masaüstüne **Akış** kısayolu eklenir.
-5. Başlat menüsüne **Akış** eklenir.
-6. Kurulum tamamlanınca uygulama açılır.
+Hayır. Akış her değişikliği otomatik kaydeder. Kaydet düğmesine basmanız, tarayıcı açmanız veya günlük yedek almanız gerekmez.
 
-Yönetici hesabı, Node.js, Git, PowerShell veya başka bir program kurmanız gerekmez.
-
-## 7. Programı sonraki günlerde nasıl açacaksınız?
-
-Her kullanımda yalnızca şunu yapın:
-
-1. Masaüstündeki **Akış** simgesini bulun.
-2. Simgeye çift tıklayın.
-
-Masaüstü kısayolunu bulamazsanız:
-
-1. Windows Başlat düğmesine basın.
-2. Arama bölümüne `Akış` yazın.
-3. Sonuçlardaki Akış uygulamasına tıklayın.
-
-Tarayıcı veya PowerShell açmanız gerekmez.
-
-## 8. Verileriniz nereye kaydedilir?
-
-Akış bütün proje, görev, Kanban ve mind map verilerinizi otomatik olarak şu klasöre kaydeder:
+Ana veri dosyası:
 
 ```text
 Belgeler\Akış\Save\workspace.akis.json
 ```
 
-Saatlik güvenlik kopyaları şu klasörde tutulur:
+Otomatik güvenlik kopyaları:
 
 ```text
 Belgeler\Akış\Save\Backups
 ```
 
-Bilmeniz gerekenler:
+Sistem şu güvenlik adımlarını kendi yapar:
 
-- Her değişiklik otomatik kaydedilir.
-- Manuel olarak “Kaydet” düğmesine basmanız gerekmez.
-- Değişiklik varsa saatte en fazla bir otomatik güvenlik kopyası oluşturulur.
-- Son 60 sağlam güvenlik kopyası korunur.
-- Program kapanıp açıldığında son çalışma alanınız geri gelir.
-- Windows yeniden başlatıldığında verileriniz kaybolmaz.
-- Programı güncellemek Save klasörünü silmez.
-- Programı kaldırmak Save klasörünü otomatik olarak silmez.
+- Dosyayı önce geçici bir dosyaya eksiksiz yazar ve doğrular.
+- Önceki sağlam sürümü `workspace.previous.akis.json` olarak korur.
+- Değişiklik varsa saatte en fazla bir güvenlik kopyası oluşturur.
+- Son 60 sağlam otomatik kopyayı saklar.
+- Ana dosya bozulmuşsa önce previous, sonra en yeni sağlam yedeği dener.
+- Kurtarma yapıldıysa uygulamada bunu bildirir.
+- Sağlam kopya bulunamazsa sorunlu verinin üzerine boş çalışma alanı yazmaz.
 
-`workspace.akis.json` dosyasını Not Defteri veya başka bir programla elle değiştirmeyin.
+Save klasörünü uygulamada **Ayarlar → Otomatik kayıt → Save klasörünü aç** yoluyla görebilirsiniz. Dosyaları günlük kullanımda elle düzenlemeyin.
 
-Save klasörünü uygulamanın içinden açmak için:
+## 8. Bilgisayarı kapatınca veriler ne olur?
 
-1. Akış'ta **Ayarlar** bölümüne girin.
-2. **Otomatik kayıt** bölümünü bulun.
-3. **Save klasörünü aç** düğmesine tıklayın.
+Projeler, görevler, finans bilgileri, tahsilatlar, temanız ve zihin haritalarınız diskte kalır. Bilgisayarı veya Akış'ı yeniden açtığınızda son kayıt geri gelir. Pencere kapanırken de en son çalışma alanı bir kez daha güvenli biçimde yazılır.
 
-## 9. Programı başka bir bilgisayara kurmak
-
-Yeni bilgisayarda yalnızca programı kullanmaya başlayacaksanız:
-
-1. Yeni bilgisayarda [en güncel sürümü indirin](https://github.com/Hamitp/kanban/releases/latest).
-2. `Akis-Setup-...-x64.exe` dosyasını çalıştırın.
-3. Masaüstündeki Akış kısayolunu açın.
-
-Program yeni ve boş bir çalışma alanıyla başlayacaktır.
-
-### Eski bilgisayardaki çalışmalarınızı da taşımak istiyorsanız
-
-Bu işlem yalnız bilgisayar değiştirirken gereklidir; günlük yedekleme için yapılmaz.
-
-1. Eski bilgisayarda Akış'ı kapatın.
-2. `Belgeler\Akış` klasörünü USB belleğe veya güvenilir bir bulut klasörüne kopyalayın.
-3. Yeni bilgisayara Akış'ı kurun.
-4. Yeni bilgisayarda Akış'ı bir kez açıp kapatın.
-5. Yeni bilgisayardaki `Belgeler\Akış` klasörünü açın.
-6. Eski bilgisayardan kopyaladığınız **Save** klasörünü buraya yerleştirin.
-7. Akış'ı yeniden açın.
-
-Eski projeleriniz, görevleriniz, temanız ve mind mapleriniz yeni bilgisayarda görünmelidir.
-
-## 10. Yeni sürüme güncellemek
-
-Yeni bir Akış sürümü yayınlandığında:
+## 9. Yeni sürüme güncelleme
 
 1. Akış'ı kapatın.
-2. [GitHub'daki en güncel sürüm sayfasını](https://github.com/Hamitp/kanban/releases/latest) açın.
+2. [En güncel sürümü](https://github.com/Hamitp/kanban/releases/latest) açın.
 3. Yeni `Akis-Setup-...-x64.exe` dosyasını indirin.
-4. İndirdiğiniz dosyaya çift tıklayın.
-5. Kurulum tamamlanınca masaüstündeki Akış kısayolunu açın.
+4. Dosyaya çift tıklayıp kurulumu tamamlayın.
+5. Akış simgesini yeniden açın.
 
-Yeni sürüm mevcut programın üzerine kurulur. `Belgeler\Akış\Save` klasöründeki verileriniz korunur.
+Yeni sürüm `Belgeler\Akış\Save` klasörünü silmez. Önceki Electron tabanlı Akış sürümünden 1.0'a geçerken de aynı veri biçimi ve klasör kullanılır.
 
-## 11. Programı kaldırmak
+## 10. Başka bir bilgisayara kurma
+
+Yeni bilgisayarda boş başlamak için yalnız son sürüm kurulumunu indirip çalıştırın.
+
+Eski bilgisayardaki çalışmalarınızı da taşımak istiyorsanız bu işlem yalnız bilgisayar değiştirirken bir kez gerekir:
+
+1. Eski bilgisayarda Akış'ı kapatın.
+2. `Belgeler\Akış\Save` klasörünü USB belleğe veya güvendiğiniz bir bulut klasörüne kopyalayın.
+3. Yeni bilgisayara Akış'ı kurup bir kez açın, sonra kapatın.
+4. Kopyaladığınız **Save** klasörünü yeni bilgisayardaki `Belgeler\Akış` klasörüne yerleştirin.
+5. Akış'ı açın.
+
+Bu manuel işlem günlük yedekleme için değil, yalnız iki bilgisayar arasında veri taşımak içindir.
+
+## 11. Programı kaldırma
 
 1. Windows **Ayarlar** uygulamasını açın.
-2. **Uygulamalar** bölümüne girin.
-3. **Yüklü uygulamalar** listesini açın.
-4. Akış'ı bulun.
-5. Yanındaki menüden **Kaldır** seçeneğine basın.
+2. **Uygulamalar → Yüklü uygulamalar** bölümüne girin.
+3. Akış'ı bulup **Kaldır** seçeneğine basın.
 
-Program kaldırıldığında çalışma verileriniz güvenlik amacıyla `Belgeler\Akış\Save` klasöründe kalır.
-
-Kişisel verilerinizi de tamamen silmek istiyorsanız, programı kaldırdıktan sonra `Belgeler\Akış` klasörünü ayrıca silebilirsiniz. Bu işlem geri alınamaz.
+Uygulama kaldırıldığında veriler güvenlik amacıyla `Belgeler\Akış\Save` klasöründe kalır. Verileri de tamamen silmek istiyorsanız uygulamayı kaldırdıktan sonra `Belgeler\Akış` klasörünü ayrıca silebilirsiniz. Bu son işlem geri alınamaz.
 
 ## 12. Sık karşılaşılan sorunlar
 
-### “Windows bilgisayarınızı korudu” mesajı çıkıyor
+### Masaüstü kısayolunu bulamıyorum
 
-Bu rehberin **Windows güvenlik uyarısı gösterirse** bölümündeki adımları izleyin. Dosyayı yalnızca resmi GitHub deposundan indirdiğinizden emin olun.
+Windows Başlat menüsünde `Akış` araması yapın. Uygulama görünmüyorsa kurulum dosyasını yeniden çalıştırın.
 
-### Masaüstünde kısayol oluşmadı
-
-Windows Başlat menüsünde `Akış` araması yapın. Uygulama orada görünüyorsa sağ tıklayıp masaüstü kısayolu oluşturabilirsiniz. Görünmüyorsa kurulum dosyasını yeniden çalıştırın.
-
-### Simgeye tıklıyorum fakat pencere açılmıyor
+### Simgeye tıklıyorum ama pencere görünmüyor
 
 1. Birkaç saniye bekleyin.
-2. Akış simgesine tekrar çift tıklayın. İkinci tıklama mevcut pencereyi öne getirir.
-3. Olmazsa bilgisayarı yeniden başlatıp tekrar deneyin.
-4. Sorun devam ederse GitHub'da hata kaydı oluşturun.
+2. Akış simgesine yeniden çift tıklayın; mevcut pencere öne gelmelidir.
+3. Gerekirse Windows'u yeniden başlatın.
 
 ### Projelerim görünmüyor
 
-1. Akış'ı kapatın.
-2. `Belgeler\Akış\Save` klasörünün mevcut olduğunu kontrol edin.
-3. Save veya Backups klasöründeki dosyaları silmeyin ya da değiştirmeyin.
-4. Sorunu [GitHub Issues](https://github.com/Hamitp/kanban/issues) bölümünden bildirin.
+1. Save klasöründeki dosyaları silmeyin veya değiştirmeyin.
+2. Akış'ı yeniden açın; otomatik kurtarma previous ve yedekleri sırayla dener.
+3. Sorun sürerse [GitHub Issues](https://github.com/Hamitp/kanban/issues) sayfasında hata kaydı açın.
 
-### Antivirüs programı kurulum dosyasını engelliyor
+### Kurulum WebView2 indirmek istiyor
 
-Kurulum dosyasını yalnızca resmi GitHub Releases sayfasından indirdiğinizi doğrulayın. Dosyayı indirirken oluşan uyarının ekran görüntüsüyle birlikte GitHub'da hata kaydı açabilirsiniz.
+Bu normaldir ve yalnız bilgisayarınızda ortak Microsoft WebView2 bileşeni yoksa olur. Akış ayrı bir Chromium kopyası taşımadığı için kendi kurulum dosyası küçük kalır.
 
-## 13. Yardım veya hata bildirimi
+## 13. Yardım ve hata bildirimi
 
-Bir sorun yaşarsanız şu sayfayı açın:
-
-**[Akış hata ve öneri sayfası](https://github.com/Hamitp/kanban/issues)**
-
-**New issue** düğmesine basıp şu bilgileri yazmanız yeterlidir:
+**[Akış hata ve öneri sayfasını açın](https://github.com/Hamitp/kanban/issues)** ve **New issue** düğmesine basın. Teknik terim kullanmadan şunları yazmanız yeterlidir:
 
 - Ne yapmaya çalışıyordunuz?
 - Hangi düğmeye bastınız?
 - Ne olmasını bekliyordunuz?
 - Bunun yerine ne oldu?
-- Varsa hata mesajının veya ekranın görüntüsü
+- Varsa ekran görüntüsü veya hata metni
 
-Teknik terimler kullanmanız gerekmez.
+## Güvenli bağlantılar
 
----
-
-## Güvenli indirme bağlantıları
-
-- Resmi proje: [github.com/Hamitp/kanban](https://github.com/Hamitp/kanban)
-- En güncel Windows sürümü: [github.com/Hamitp/kanban/releases/latest](https://github.com/Hamitp/kanban/releases/latest)
-- Kurulum rehberi: [docs/KURULUM_REHBERI.md](https://github.com/Hamitp/kanban/blob/main/docs/KURULUM_REHBERI.md)
-- Hata ve öneriler: [github.com/Hamitp/kanban/issues](https://github.com/Hamitp/kanban/issues)
+- [Resmî proje](https://github.com/Hamitp/kanban)
+- [En güncel Windows kurulumu](https://github.com/Hamitp/kanban/releases/latest)
+- [Bu kurulum rehberi](https://github.com/Hamitp/kanban/blob/main/docs/KURULUM_REHBERI.md)
+- [Hata ve öneriler](https://github.com/Hamitp/kanban/issues)

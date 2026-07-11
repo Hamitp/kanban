@@ -7,21 +7,31 @@ import {
   Copy,
   Focus,
   GitBranch,
+  Hand,
   LayoutGrid,
   ListTree,
   Maximize2,
   Minus,
   Palette,
+  PanelRightClose,
+  PanelRightOpen,
   Plus,
-  Sparkles,
   Trash2,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MindMap, MindNode } from "../types";
 import { CanvasZoomControls } from "./CanvasZoomControls";
+import { useCanvasPan } from "./useCanvasPan";
 import { useCanvasZoom } from "./useCanvasZoom";
 
 const nodeColors = ["violet", "coral", "sage", "blue", "amber"];
+const nodeColorNames: Record<string, string> = {
+  violet: "Eflatun",
+  coral: "Mercan",
+  sage: "Adaçayı",
+  blue: "Mavi",
+  amber: "Kehribar",
+};
 const nodeWidth = 202;
 const nodeHeight = 78;
 
@@ -56,10 +66,12 @@ export function MindMapView({
 }: MindMapViewProps) {
   const [selectedId, setSelectedId] = useState(map.nodes[0]?.id);
   const [outlineOpen, setOutlineOpen] = useState(true);
+  const [inspectorOpen, setInspectorOpen] = useState(true);
   const [editingTitle, setEditingTitle] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const {
     zoom,
+    setZoom,
     zoomIn,
     zoomOut,
     resetZoom,
@@ -71,6 +83,12 @@ export function MindMapView({
     maxZoom: 1.8,
     scrollRef,
     onZoomChange,
+  });
+  useCanvasPan({
+    scrollRef,
+    canStartWithLeftButton: (target) =>
+      target instanceof Element &&
+      !target.closest(".mind-node, button, input, textarea, select, a"),
   });
   const [drag, setDrag] = useState<{
     id: string;
@@ -84,6 +102,7 @@ export function MindMapView({
 
   const selected = map.nodes.find((node) => node.id === selectedId) ?? map.nodes[0];
   const root = map.nodes.find((node) => !node.parentId);
+  const hasCenteredRef = useRef(false);
 
   useEffect(() => {
     if (!drag) return;
@@ -106,9 +125,11 @@ export function MindMapView({
     };
     window.addEventListener("pointermove", handleMove);
     window.addEventListener("pointerup", handleUp, { once: true });
+    window.addEventListener("pointercancel", handleUp, { once: true });
     return () => {
       window.removeEventListener("pointermove", handleMove);
       window.removeEventListener("pointerup", handleUp);
+      window.removeEventListener("pointercancel", handleUp);
     };
   }, [drag, onMoveNode, zoom]);
 
@@ -119,6 +140,10 @@ export function MindMapView({
       ),
     [drag, map.nodes],
   );
+  const canvasSize = useMemo(() => ({
+    width: Math.max(1500, ...displayNodes.map((node) => node.x + nodeWidth + 300)),
+    height: Math.max(900, ...displayNodes.map((node) => node.y + nodeHeight + 220)),
+  }), [displayNodes]);
 
   const treeRows = useMemo(() => {
     if (!root) return [];
@@ -131,15 +156,43 @@ export function MindMapView({
     return rows;
   }, [map.nodes, root]);
 
-  function centerMap() {
+  const centerMap = useCallback((behavior: ScrollBehavior = "smooth") => {
     const container = scrollRef.current;
     if (!container || !root) return;
     container.scrollTo({
       left: Math.max(0, (root.x + nodeWidth / 2) * zoom - container.clientWidth / 2),
       top: Math.max(0, (root.y + nodeHeight / 2) * zoom - container.clientHeight / 2),
-      behavior: "smooth",
+      behavior,
     });
-  }
+  }, [root, scrollRef, zoom]);
+
+  const fitMap = useCallback(() => {
+    const container = scrollRef.current;
+    if (!container || !displayNodes.length) return;
+    const minX = Math.min(...displayNodes.map((node) => node.x));
+    const minY = Math.min(...displayNodes.map((node) => node.y));
+    const maxX = Math.max(...displayNodes.map((node) => node.x + nodeWidth));
+    const maxY = Math.max(...displayNodes.map((node) => node.y + nodeHeight));
+    const nextZoom = Math.max(0.5, Math.min(1.4, Math.min(
+      (container.clientWidth - 100) / Math.max(1, maxX - minX),
+      (container.clientHeight - 100) / Math.max(1, maxY - minY),
+    )));
+    if (Math.abs(nextZoom - zoom) > 0.04) setZoom(nextZoom);
+    window.requestAnimationFrame(() => {
+      container.scrollTo({
+        left: Math.max(0, minX * nextZoom - 50),
+        top: Math.max(0, minY * nextZoom - 50),
+        behavior: "smooth",
+      });
+    });
+  }, [displayNodes, scrollRef, setZoom, zoom]);
+
+  useEffect(() => {
+    if (hasCenteredRef.current || !root) return;
+    hasCenteredRef.current = true;
+    const frame = window.requestAnimationFrame(() => centerMap("auto"));
+    return () => window.cancelAnimationFrame(frame);
+  }, [centerMap, root]);
 
   function addChild(parentId?: string) {
     const id = onAddNode(parentId);
@@ -154,7 +207,7 @@ export function MindMapView({
             <ArrowLeft size={18} />
           </button>
           <div>
-            <div className="eyebrow">{projectName} / Mind Map</div>
+            <div className="eyebrow">{projectName} / Zihin haritası</div>
             {editingTitle ? (
               <input
                 className="inline-title-input"
@@ -169,7 +222,7 @@ export function MindMapView({
                 }}
               />
             ) : (
-              <button className="title-button" onClick={() => setEditingTitle(true)}>
+              <button className="title-button" onClick={() => setEditingTitle(true)} aria-label="Zihin haritası adını düzenle">
                 <h1>{map.title}</h1>
               </button>
             )}
@@ -185,7 +238,7 @@ export function MindMapView({
         </div>
       </header>
 
-      <div className="map-toolbar" aria-label="Mind map araçları">
+      <div className="map-toolbar" role="toolbar" aria-label="Zihin haritası araçları">
         <button className="tool-button" onClick={() => addChild(selected?.id)} disabled={!selected}>
           <Plus size={16} /> Alt fikir
         </button>
@@ -194,7 +247,7 @@ export function MindMapView({
         </button>
         <span className="toolbar-divider" />
         <CanvasZoomControls
-          label="Mind map"
+          label="Zihin haritası"
           zoom={zoom}
           onZoomIn={zoomIn}
           onZoomOut={zoomOut}
@@ -202,23 +255,28 @@ export function MindMapView({
           isMinZoom={isMinZoom}
           isMaxZoom={isMaxZoom}
         />
-        <button className="tool-button" onClick={centerMap}><Focus size={16} /> Merkezle</button>
+        <button className="tool-button" onClick={() => centerMap()}><Focus size={16} /> Merkezle</button>
+        <button className="tool-button" onClick={fitMap}><Maximize2 size={16} /> Tümünü sığdır</button>
         <button className="tool-button" onClick={onAutoLayout}><LayoutGrid size={16} /> Otomatik düzen</button>
         <div className="spacer" />
-        <button className={`tool-button ${outlineOpen ? "active" : ""}`} onClick={() => setOutlineOpen((value) => !value)}>
+        <button className={`tool-button ${outlineOpen ? "active" : ""}`} aria-pressed={outlineOpen} onClick={() => setOutlineOpen((value) => !value)}>
           <ListTree size={16} /> Anahat
+        </button>
+        <button className={`tool-button ${inspectorOpen ? "active" : ""}`} aria-pressed={inspectorOpen} onClick={() => setInspectorOpen((value) => !value)}>
+          {inspectorOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />} Ayrıntılar
         </button>
       </div>
 
       <div className="map-workspace">
         {outlineOpen && (
-          <aside className="map-outline" aria-label="Mind map anahat görünümü">
+          <aside className="map-outline" aria-label="Zihin haritası anahat görünümü">
             <header><ListTree size={17} /><strong>Anahat</strong><span>{map.nodes.length} fikir</span></header>
             <div className="outline-tree">
               {treeRows.map(({ node, depth }) => (
                 <button
                   key={node.id}
                   className={node.id === selected?.id ? "active" : ""}
+                  aria-current={node.id === selected?.id ? "true" : undefined}
                   style={{ paddingLeft: 12 + depth * 18 }}
                   onClick={() => setSelectedId(node.id)}
                 >
@@ -231,10 +289,10 @@ export function MindMapView({
           </aside>
         )}
 
-        <div className="map-scroll" ref={scrollRef}>
-          <div className="map-canvas-grid" style={{ width: 1500 * zoom, height: 900 * zoom }}>
-            <div className="map-canvas" style={{ transform: `scale(${zoom})` }}>
-              <svg className="map-edges" width="1500" height="900" aria-hidden="true">
+        <div className="map-scroll" ref={scrollRef} role="region" aria-label="Zihin haritası tuvali. Boş alanda sürükleyerek gezinebilirsiniz.">
+          <div className="map-canvas-grid" style={{ width: canvasSize.width * zoom, height: canvasSize.height * zoom }}>
+            <div className="map-canvas" style={{ width: canvasSize.width, height: canvasSize.height, transform: `scale(${zoom})` }}>
+              <svg className="map-edges" width={canvasSize.width} height={canvasSize.height} aria-hidden="true">
                 {displayNodes
                   .filter((node) => node.parentId)
                   .map((node) => {
@@ -259,6 +317,8 @@ export function MindMapView({
                 <button
                   key={node.id}
                   className={`mind-node ${node.color} ${node.id === selected?.id ? "selected" : ""} ${!node.parentId ? "root" : ""}`}
+                  aria-label={`${node.title}, ${!node.parentId ? "ana konu" : "fikir"}`}
+                  aria-pressed={node.id === selected?.id}
                   style={{ left: node.x, top: node.y }}
                   onClick={() => setSelectedId(node.id)}
                   onDoubleClick={() => setSelectedId(node.id)}
@@ -282,21 +342,25 @@ export function MindMapView({
                   {node.note && <small>{node.note}</small>}
                 </button>
               ))}
-              <div className="canvas-hint"><Sparkles size={15} /> Fikirleri sürükleyerek düzenleyebilirsiniz</div>
+              <div className="canvas-hint"><Hand size={15} /> Boş alanda sürükleyerek gezinin · fikir kartlarını tutarak düzenleyin</div>
             </div>
           </div>
         </div>
 
-        {selected && (
+        {selected && inspectorOpen && (
           <NodeInspector
             key={selected.id}
             node={selected}
+            onCollapse={() => setInspectorOpen(false)}
             onUpdate={(patch) => onUpdateNode(selected.id, patch)}
             onDelete={() => {
               const childCount = map.nodes.filter((node) => node.parentId === selected.id).length;
-              if (childCount && !window.confirm("Bu fikirle birlikte tüm alt dallar da silinecek. Devam edilsin mi?")) return;
+              const message = childCount
+                ? "Bu fikirle birlikte tüm alt dallar da silinecek. Devam edilsin mi?"
+                : "Bu fikir silinsin mi?";
+              if (!window.confirm(message)) return;
               onDeleteNode(selected.id);
-              setSelectedId(selected.parentId ?? root?.id);
+              setSelectedId(selected.parentId ?? root?.id ?? "");
             }}
           />
         )}
@@ -305,19 +369,48 @@ export function MindMapView({
   );
 }
 
-function NodeInspector({ node, onUpdate, onDelete }: { node: MindNode; onUpdate: (patch: Partial<MindNode>) => void; onDelete: () => void }) {
+function NodeInspector({ node, onUpdate, onDelete, onCollapse }: { node: MindNode; onUpdate: (patch: Partial<MindNode>) => void; onDelete: () => void; onCollapse: () => void }) {
   const [title, setTitle] = useState(node.title);
   const [note, setNote] = useState(node.note);
+  const onUpdateRef = useRef(onUpdate);
+  const draftRef = useRef({ title, note });
+  const persistedRef = useRef({ title: node.title, note: node.note });
+  useEffect(() => {
+    onUpdateRef.current = onUpdate;
+  }, [onUpdate]);
+  useEffect(() => {
+    draftRef.current = { title, note };
+    const timer = window.setTimeout(() => {
+      const cleanTitle = title.trim();
+      const cleanNote = note.trim();
+      if (!cleanTitle) return;
+      if (cleanTitle === persistedRef.current.title && cleanNote === persistedRef.current.note) return;
+      persistedRef.current = { title: cleanTitle, note: cleanNote };
+      onUpdateRef.current({ title: cleanTitle, note: cleanNote });
+    }, 320);
+    return () => window.clearTimeout(timer);
+  }, [note, title]);
+  useEffect(() => () => {
+    const cleanTitle = draftRef.current.title.trim();
+    const cleanNote = draftRef.current.note.trim();
+    if (!cleanTitle) return;
+    if (cleanTitle === persistedRef.current.title && cleanNote === persistedRef.current.note) return;
+    onUpdateRef.current({ title: cleanTitle, note: cleanNote });
+  }, []);
   return (
     <aside className="node-inspector" aria-label="Fikir ayrıntıları">
-      <header><div><span className="eyebrow">Seçili fikir</span><h3>Düşünceyi geliştir</h3></div><Maximize2 size={17} /></header>
+      <header><div><span className="eyebrow">Seçili fikir</span><h3>Düşünceyi geliştir</h3></div><button className="icon-button" onClick={onCollapse} aria-label="Fikir ayrıntılarını daralt"><PanelRightClose size={17} /></button></header>
       <label className="field-label">
         Başlık
         <input
           value={title}
           onChange={(event) => setTitle(event.target.value)}
-          onBlur={() => title.trim() && onUpdate({ title: title.trim() })}
+          onBlur={() => {
+            if (!title.trim()) setTitle(node.title);
+          }}
+          aria-invalid={!title.trim()}
         />
+        {!title.trim() && <span className="field-error">Fikir başlığı boş bırakılamaz.</span>}
       </label>
       <label className="field-label">
         Not
@@ -325,7 +418,6 @@ function NodeInspector({ node, onUpdate, onDelete }: { node: MindNode; onUpdate:
           rows={5}
           value={note}
           onChange={(event) => setNote(event.target.value)}
-          onBlur={() => onUpdate({ note: note.trim() })}
           placeholder="Bu fikrin bağlamı..."
         />
       </label>
@@ -337,13 +429,14 @@ function NodeInspector({ node, onUpdate, onDelete }: { node: MindNode; onUpdate:
               key={color}
               className={`${color} ${node.color === color ? "selected" : ""}`}
               onClick={() => onUpdate({ color })}
-              aria-label={`${color} rengini seç`}
+              aria-label={`${nodeColorNames[color]} rengini seç`}
+              aria-pressed={node.color === color}
             />
           ))}
         </div>
       </div>
       {node.parentId && <button className="danger-ghost wide" onClick={onDelete}><Trash2 size={16} /> Bu dalı sil</button>}
-      <div className="inspector-tip"><Minus size={14} /><span>İpucu: Tuvalde sürükleyerek konumlandırın.</span></div>
+      <div className="inspector-tip"><Minus size={14} /><span>İpucu: Fikir kartını sürükleyerek konumlandırın; boş alanı sürükleyerek haritada gezinin.</span></div>
     </aside>
   );
 }

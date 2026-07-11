@@ -1,0 +1,15 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main-workspace",
+  "description": "Ana pencereye yalnız Akış çalışma alanını yükleme, kaydetme ve sabit Save klasörünü açma yetkisi verir.",
+  "windows": ["main"],
+  "platforms": ["windows", "macOS", "linux"],
+  "permissions": [
+    "core:event:default",
+    "core:window:allow-destroy",
+    "allow-load",
+    "allow-save",
+    "allow-info",
+    "allow-open-save-folder"
+  ]
+}

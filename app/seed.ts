@@ -1,4 +1,4 @@
-import type { AppData, KanbanBoard, MindMap } from "./types";
+import type { AppData, KanbanBoard, MindMap, Project } from "./types";
 
 const iso = (days = 0) => {
   const date = new Date();
@@ -63,7 +63,7 @@ export function createBoard(
 
 export function createMindMap(
   projectId: string,
-  title = "Yeni Mind Map",
+  title = "Yeni Zihin Haritası",
 ): MindMap {
   const now = iso();
   return {
@@ -91,20 +91,37 @@ export function createMindMap(
 
 export function createSeedData(): AppData {
   const now = iso();
-  const projectOne = {
+  const projectOne: Project = {
     id: newId(),
     name: "Kanban Uygulaması",
     description: "Yerel ve zarif çalışma alanı",
     color: "#6f63d9",
+    clientName: "Örnek Müşteri",
+    status: "active",
+    finance: {
+      currency: "TRY",
+      agreedAmountKurus: 25_000_000,
+      payments: [
+        {
+          id: newId(),
+          amountKurus: 7_500_000,
+          receivedOn: iso(-12).slice(0, 10),
+          note: "Başlangıç ödemesi",
+          createdAt: iso(-12),
+          updatedAt: iso(-12),
+        },
+      ],
+    },
     archived: false,
     createdAt: now,
     updatedAt: now,
   };
-  const projectTwo = {
+  const projectTwo: Project = {
     id: newId(),
     name: "Kişisel Sistem",
     description: "Haftalık plan ve gelişim alanı",
     color: "#d27a55",
+    status: "active",
     archived: false,
     createdAt: now,
     updatedAt: now,
@@ -127,7 +144,7 @@ export function createSeedData(): AppData {
     },
     [taskIds[1]]: {
       id: taskIds[1],
-      title: "Mind map etkileşimlerini tasarla",
+      title: "Zihin haritası etkileşimlerini tasarla",
       description: "Node ekleme, taşıma ve dal yapısının temel davranışları.",
       priority: "medium",
       labelIds: ["label-design"],
@@ -171,7 +188,7 @@ export function createSeedData(): AppData {
     [taskIds[5]]: {
       id: taskIds[5],
       title: "Proje kapsamını netleştir",
-      description: "Kanban, mind map ve arşiv ihtiyaçları belirlendi.",
+      description: "Kanban panosu, zihin haritası ve arşiv ihtiyaçları belirlendi.",
       priority: "medium",
       labelIds: ["label-product"],
       assigneeIds: ["member-hamit"],
@@ -223,7 +240,7 @@ export function createSeedData(): AppData {
     {
       id: newId(),
       title: "Düşünceden işe",
-      note: "Mind map ile Kanban arasında doğal geçiş",
+      note: "Zihin haritası ile Kanban panosu arasında doğal geçiş",
       x: 930,
       y: 520,
       color: "blue",

@@ -1,63 +1,67 @@
 # Akış
 
-Akış; birden fazla projeyi Kanban boardlar ve mind mapler aracılığıyla yöneten, internet bağlantısı gerektirmeyen kişisel Windows masaüstü uygulamasıdır.
+Akış; birden fazla projeyi Kanban panoları ve zihin haritalarıyla yönetmek, görev sürelerini ve proje finansını izlemek için hazırlanmış çevrimdışı bir Windows masaüstü uygulamasıdır.
 
 ## Programı kullanmak istiyorsanız
 
-Kod indirmeniz veya geliştirici araçları kurmanız gerekmez:
+Kod, PowerShell, Node.js veya Git kurmanız gerekmez:
 
-1. **[En güncel Windows kurulum dosyasını açın](https://github.com/Hamitp/kanban/releases/latest).**
+1. [En güncel Akış sürümünü açın](https://github.com/Hamitp/kanban/releases/latest).
 2. `Akis-Setup-...-x64.exe` dosyasını indirin.
-3. Dosyaya çift tıklayın.
-4. Kurulumdan sonra masaüstündeki **Akış** simgesini açın.
+3. Dosyaya çift tıklayıp kurulumu tamamlayın.
+4. Masaüstündeki veya Başlat menüsündeki **Akış** simgesini açın.
 
-İlk kez kurulum yapıyorsanız ayrıntılı anlatımı okuyun:
+İlk kurulum, güncelleme, başka bilgisayara taşıma ve olası Windows uyarıları için:
 
 ### [Hiç bilmeyenler için adım adım Windows kurulum rehberi](docs/KURULUM_REHBERI.md)
 
-## Kısa kurulum özeti
+## Verileriniz
 
-1. `Akis-Setup-...-x64.exe` kurulum dosyasını bir kez çalıştırın.
-2. Kurulumdan sonra masaüstündeki **Akış** kısayoluna çift tıklayın.
-3. Tarayıcı, PowerShell veya başka bir geliştirme aracı açmanız gerekmez.
-
-Uygulama bütün değişiklikleri otomatik olarak şu klasöre kaydeder:
+Her değişiklik otomatik olarak şu dosyaya yazılır:
 
 ```text
 Belgeler\Akış\Save\workspace.akis.json
 ```
 
-Saatlik güvenlik kopyaları `Belgeler\Akış\Save\Backups` altında otomatik tutulur. Kullanıcının manuel yedek alması gerekmez. Uygulama kaldırılıp yeniden kurulduğunda Save klasörü korunur.
+Değişiklik olduğunda saatlik güvenlik kopyaları `Belgeler\Akış\Save\Backups` altında oluşturulur; son 60 sağlam kopya korunur. Günlük kullanımda manuel kaydetme veya yedekleme yapmanız gerekmez. Uygulamanın güncellenmesi ya da kaldırılması Save klasörünü silmez.
 
-## Özellikler
+## Başlıca özellikler
 
-- Proje altında birden fazla Kanban board ve mind map
-- Özelleştirilebilir sütunlar ve sürükle-bırak görev akışı
-- Kanban ve mind map alanlarında düğmelerle veya `Ctrl + fare tekerleği` ile yakınlaştırma
-- Daha rahat okunabilen arayüz yazıları ve her çalışma alanı için kaydedilen yakınlaştırma seviyesi
-- Etiketler, bekleme/engel nedeni, son tarih ve çoklu kişi ataması
-- Görev çalışma süresi ve proje ilerleme analitiği
-- Mind map üzerinde fikir ekleme, taşıma, renklendirme ve otomatik düzen
+- Proje başına birden fazla özelleştirilebilir Kanban panosu ve zihin haritası
+- Boş alanda sol tuşla veya orta tuşla gezinen; `Ctrl + fare tekerleği` ile yakınlaşan çalışma alanları
+- Sürükle-bırak, görünür bırakma hedefleri, kenarda otomatik kaydırma ve klavyeyle görev taşıma
+- Etiketler, bekleme/engel nedeni, öncelik, son tarih ve birden fazla kişi ataması
+- Görevin aktif çalışma süresi ve tamamlanma süresi geçmişi
+- Aktif, tamamlandı ve müşteriye teslim edildi proje aşamaları
+- Anlaşılan tutar, kısmi/tam tahsilat, bekleyen alacak ve tahsilat geçmişi
+- İlerleme, çevrim süresi, haftalık teslim ritmi, iş yükü, risk ve nakit akışı içgörüleri
+- Daraltılabilir fikir ayrıntıları, otomatik düzen ve tümünü sığdırma özellikli zihin haritası
 - Arşivleme, geri getirme ve başka projeye bağımsız kopyalama
-- Dört tema, otomatik dosya kaydı ve otomatik güvenlik kopyaları
-- Tek uygulama örneği ve bozuk dosyadan otomatik kurtarma
+- Dört tema, kişisel profil adı ve erişilebilir klavye odağı
+- Atomik yerel kayıt, checksum doğrulaması, previous/yedek kurtarma ve tek uygulama örneği
+
+## Neden küçük?
+
+Akış, kendi içinde ayrı bir Chromium kopyası taşımak yerine Windows'un ortak WebView2 bileşenini kullanan Tauri masaüstü mimarisine sahiptir. Uygulama kodu ve kurulum dosyası bu nedenle klasik Electron paketlerinden belirgin biçimde küçüktür. Kurulum dosyasının kesin boyutu her sürümün GitHub **Assets** bölümünde görünür.
 
 ## Geliştirme
 
-Node.js 22.13 veya daha yeni bir sürümle:
+Bu bölüm yalnız projeye kod katkısı yapmak isteyenler içindir. Son kullanıcıların bunları kurması gerekmez.
 
-```bash
-npm install
-npm run dev
+Gerekenler: Node.js 22+, Rust stable, Microsoft C++ Build Tools ve Windows SDK.
+
+```powershell
+npm ci
+npm run check
 npm run desktop:run
 ```
 
-Windows kurulum dosyası üretmek için:
+Windows NSIS kurulumunu üretmek için:
 
-```bash
+```powershell
 npm run desktop:dist
 ```
 
 ## Lisans
 
-MIT
+[MIT](LICENSE)

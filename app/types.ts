@@ -1,6 +1,22 @@
 export type ThemeId = "linen" | "night" | "sand" | "forest";
 export type Priority = "low" | "medium" | "high" | "critical";
 export type ItemKind = "board" | "mindmap";
+export type ProjectStatus = "active" | "completed" | "delivered";
+
+export interface ProjectPayment {
+  id: string;
+  amountKurus: number;
+  receivedOn: string;
+  note?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProjectFinance {
+  currency: "TRY";
+  agreedAmountKurus: number;
+  payments: ProjectPayment[];
+}
 
 export interface Member {
   id: string;
@@ -21,6 +37,11 @@ export interface Project {
   name: string;
   description: string;
   color: string;
+  clientName?: string;
+  status?: ProjectStatus;
+  completedAt?: string;
+  deliveredAt?: string;
+  finance?: ProjectFinance;
   archived: boolean;
   createdAt: string;
   updatedAt: string;
@@ -93,6 +114,8 @@ export interface MindMap {
 export interface AppData {
   version: 1;
   workspaceName: string;
+  /** Optional for backward compatibility with workspaces created before profiles existed. */
+  profileName?: string;
   theme: ThemeId;
   projects: Project[];
   boards: KanbanBoard[];
@@ -108,6 +131,7 @@ export type Screen =
   | { kind: "projects" }
   | { kind: "boards" }
   | { kind: "mindmaps" }
+  | { kind: "insights" }
   | { kind: "project"; id: string }
   | { kind: "board"; id: string }
   | { kind: "mindmap"; id: string }

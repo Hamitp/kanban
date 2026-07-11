@@ -171,6 +171,7 @@ export function useCanvasZoom({
 
   return {
     zoom,
+    setZoom: applyZoom,
     zoomIn,
     zoomOut,
     resetZoom,

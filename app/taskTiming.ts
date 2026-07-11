@@ -43,3 +43,20 @@ export function getTaskWorkDays(task: TaskCard, referenceTime = Date.now()): num
   return milliseconds > 0 ? Math.max(1, Math.ceil(milliseconds / 86_400_000)) : 0;
 }
 
+export function formatTaskWorkDuration(milliseconds: number): string {
+  const safeMilliseconds = Math.max(0, milliseconds);
+  const minute = 60_000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+  if (safeMilliseconds < hour) {
+    return `${Math.max(1, Math.ceil(safeMilliseconds / minute))} dk`;
+  }
+  if (safeMilliseconds < day) {
+    const hours = Math.floor(safeMilliseconds / hour);
+    const minutes = Math.floor((safeMilliseconds % hour) / minute);
+    return minutes ? `${hours} sa ${minutes} dk` : `${hours} sa`;
+  }
+  const days = Math.floor(safeMilliseconds / day);
+  const hours = Math.floor((safeMilliseconds % day) / hour);
+  return hours ? `${days} gün ${hours} sa` : `${days} gün`;
+}

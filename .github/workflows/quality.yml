@@ -1,0 +1,34 @@
+name: Quality
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: windows-latest
+    steps:
+      - name: Kaynak kodu al
+        uses: actions/checkout@v4
+
+      - name: Node.js kur
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Rust kur
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: JavaScript bağımlılıklarını kur
+        run: npm ci
+
+      - name: Arayüz ve veri testleri
+        run: npm run check
+
+      - name: Masaüstü kayıt testleri
+        run: cargo test --manifest-path src-tauri/Cargo.toml
