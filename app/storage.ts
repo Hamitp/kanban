@@ -1,4 +1,5 @@
 import type { AppData } from "./types";
+import type { DesktopSaveInfo } from "./desktop";
 
 const DB_NAME = "akis-workspace";
 const STORE_NAME = "workspace";
@@ -20,6 +21,9 @@ function openDatabase(): Promise<IDBDatabase> {
 }
 
 export async function loadWorkspace(): Promise<AppData | null> {
+  if (window.akisDesktop) {
+    return window.akisDesktop.loadWorkspace();
+  }
   try {
     const db = await openDatabase();
     const value = await new Promise<AppData | null>((resolve, reject) => {
@@ -37,6 +41,10 @@ export async function loadWorkspace(): Promise<AppData | null> {
 }
 
 export async function saveWorkspace(data: AppData): Promise<void> {
+  if (window.akisDesktop) {
+    await window.akisDesktop.saveWorkspace(data);
+    return;
+  }
   localStorage.setItem(FALLBACK_KEY, JSON.stringify(data));
   try {
     const db = await openDatabase();
@@ -52,6 +60,18 @@ export async function saveWorkspace(data: AppData): Promise<void> {
   }
 }
 
+export function isDesktopRuntime(): boolean {
+  return Boolean(window.akisDesktop);
+}
+
+export async function getDesktopSaveInfo(): Promise<DesktopSaveInfo | null> {
+  return window.akisDesktop ? window.akisDesktop.getSaveInfo() : null;
+}
+
+export async function openDesktopSaveFolder(): Promise<void> {
+  if (window.akisDesktop) await window.akisDesktop.openSaveFolder();
+}
+
 export function isWorkspaceData(value: unknown): value is AppData {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<AppData>;
@@ -64,4 +84,3 @@ export function isWorkspaceData(value: unknown): value is AppData {
     Array.isArray(candidate.labels)
   );
 }
-

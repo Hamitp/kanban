@@ -10,7 +10,9 @@ import {
   CircleAlert,
   Copy,
   Download,
+  FolderOpen,
   FolderKanban,
+  HardDrive,
   Home,
   LayoutDashboard,
   Leaf,
@@ -26,6 +28,7 @@ import {
   RotateCcw,
   Search,
   Settings2,
+  ShieldCheck,
   Sparkles,
   Sun,
   Trash2,
@@ -38,8 +41,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { BoardView } from "./components/BoardView";
 import { MindMapView } from "./components/MindMapView";
 import { createBoard, createMindMap, createSeedData, newId } from "./seed";
-import { isWorkspaceData, loadWorkspace, saveWorkspace } from "./storage";
+import {
+  getDesktopSaveInfo,
+  isDesktopRuntime,
+  isWorkspaceData,
+  loadWorkspace,
+  openDesktopSaveFolder,
+  saveWorkspace,
+} from "./storage";
 import { getTaskWorkMs, transitionTaskTiming } from "./taskTiming";
+import type { DesktopSaveInfo } from "./desktop";
 import type {
   AppData,
   ItemKind,
@@ -79,7 +90,8 @@ export default function AkisApp() {
   const [modal, setModal] = useState<ModalState>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
-  const [saveState, setSaveState] = useState<"saved" | "saving">("saved");
+  const [saveState, setSaveState] = useState<"saved" | "saving" | "error">("saved");
+  const [fatalLoadError, setFatalLoadError] = useState(false);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [toast, setToast] = useState<{ message: string; undo?: boolean } | null>(null);
   const [historyVersion, setHistoryVersion] = useState(0);
@@ -90,26 +102,42 @@ export default function AkisApp() {
   useEffect(() => {
     loadWorkspace()
       .then((stored) => setData(stored ?? createSeedData()))
+      .catch(() => setFatalLoadError(true))
       .finally(() => {
         hydrated.current = true;
       });
-    if ("serviceWorker" in navigator) {
+    if (!isDesktopRuntime() && "serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").catch(() => undefined);
     }
-    navigator.storage?.persist?.().catch(() => undefined);
+    if (!isDesktopRuntime()) navigator.storage?.persist?.().catch(() => undefined);
   }, []);
 
   useEffect(() => {
     if (!data || !hydrated.current) return;
     document.documentElement.dataset.theme = data.theme;
-    setSaveState("saving");
-    const timer = window.setTimeout(() => {
-      saveWorkspace(data).then(() => {
+    let cancelled = false;
+    let retryTimer: number | undefined;
+    const persist = () => {
+      if (cancelled) return;
+      setSaveState("saving");
+      saveWorkspace(data)
+        .then(() => {
+          if (cancelled) return;
         setSaveState("saved");
         setSavedAt(new Date());
-      });
-    }, 260);
-    return () => window.clearTimeout(timer);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setSaveState("error");
+          retryTimer = window.setTimeout(persist, 2000);
+        });
+    };
+    const timer = window.setTimeout(persist, isDesktopRuntime() ? 0 : 260);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+      if (retryTimer) window.clearTimeout(retryTimer);
+    };
   }, [data]);
 
   useEffect(() => {
@@ -172,6 +200,20 @@ export default function AkisApp() {
     const timer = window.setTimeout(() => setToast(null), 4200);
     return () => window.clearTimeout(timer);
   }, [toast]);
+
+  if (fatalLoadError) {
+    return (
+      <div className="recovery-screen">
+        <div className="recovery-card">
+          <span className="recovery-icon"><ShieldCheck size={26} /></span>
+          <span className="eyebrow">VERİLERİNİZ KORUNDU</span>
+          <h1>Çalışma alanı açılamadı</h1>
+          <p>Akış, sorunlu dosyanın üzerine yeni veri yazmadı. Save klasörünüzdeki son sağlam kopyayı inceleyebilmeniz için veriler olduğu gibi korundu.</p>
+          <button className="primary-button large" onClick={() => openDesktopSaveFolder()}><FolderOpen size={17} /> Save klasörünü aç</button>
+        </div>
+      </div>
+    );
+  }
 
   if (!data) {
     return (
@@ -836,7 +878,7 @@ function Topbar({
   mindMaps: MindMap[];
   query: string;
   searchOpen: boolean;
-  saveState: "saved" | "saving";
+  saveState: "saved" | "saving" | "error";
   savedAt: Date | null;
   canUndo: boolean;
   canRedo: boolean;
@@ -896,7 +938,7 @@ function Topbar({
       </div>
       <div className="topbar-actions">
         <div className={`save-indicator ${saveState}`}>
-          <i /> {saveState === "saving" ? "Kaydediliyor" : `Yerelde kayıtlı${savedAt ? ` · ${savedAt.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}` : ""}`}
+          <i /> {saveState === "saving" ? "Kaydediliyor" : saveState === "error" ? "Kaydedilemedi · yeniden deneniyor" : `${isDesktopRuntime() ? "Save klasörüne kaydedildi" : "Yerelde kayıtlı"}${savedAt ? ` · ${savedAt.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}` : ""}`}
         </div>
         <button className="icon-button" onClick={onUndo} disabled={!canUndo} aria-label="Geri al"><Undo2 size={17} /></button>
         <button className="icon-button" onClick={onRedo} disabled={!canRedo} aria-label="Yinele"><Redo2 size={17} /></button>
@@ -1355,6 +1397,10 @@ function SettingsScreen({
 }) {
   const [name, setName] = useState(data.workspaceName);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [desktopInfo, setDesktopInfo] = useState<DesktopSaveInfo | null>(null);
+  useEffect(() => {
+    getDesktopSaveInfo().then(setDesktopInfo).catch(() => undefined);
+  }, []);
   async function importFile(file?: File) {
     if (!file) return;
     try {
@@ -1375,7 +1421,17 @@ function SettingsScreen({
       <section className="settings-section"><div className="settings-heading"><h2>Çalışma alanı</h2><p>Başlık, tüm projelerinizin üzerinde görünür.</p></div><div className="settings-panel"><label className="field-label">Çalışma alanı adı<div className="inline-save"><input value={name} onChange={(event) => setName(event.target.value)} /><button className="secondary-button" disabled={!name.trim() || name === data.workspaceName} onClick={() => onWorkspaceName(name.trim())}><Check size={15} /> Kaydet</button></div></label></div></section>
       <section className="settings-section"><div className="settings-heading"><h2>Tema</h2><p>Odak biçiminize uygun görünümü seçin.</p></div><div className="theme-grid">{themes.map((theme) => { const Icon = theme.icon; return <button key={theme.id} className={`theme-card ${theme.id} ${data.theme === theme.id ? "selected" : ""}`} onClick={() => onTheme(theme.id)}><div className="theme-preview"><i /><i /><i /></div><span><Icon size={17} /><span><strong>{theme.name}</strong><small>{theme.description}</small></span>{data.theme === theme.id && <Check size={17} />}</span></button>; })}</div></section>
       <section className="settings-section"><div className="settings-heading"><h2>Kişiler</h2><p>Görev atamak için yerel kişi dizininiz.</p></div><div className="settings-panel"><div className="members-header"><span>{data.members.filter((member) => member.active).length} aktif kişi</span><button className="secondary-button" onClick={onNewMember}><UserPlus size={16} /> Kişi ekle</button></div><div className="settings-members">{data.members.map((member) => <div key={member.id} className={!member.active ? "inactive" : ""}><span className="member-avatar" style={{ background: member.color }}>{member.initials}</span><span><strong>{member.name}</strong><small>{member.active ? "Aktif" : "Pasif · geçmiş atamalar korunur"}</small></span><button className="text-button" onClick={() => onToggleMember(member.id)}>{member.active ? "Pasifleştir" : "Etkinleştir"}</button></div>)}</div></div></section>
-      <section className="settings-section"><div className="settings-heading"><h2>Yedekleme</h2><p>Verileriniz yalnız bu cihazda. Düzenli yedek alın.</p></div><div className="backup-panel"><div><Download size={20} /><span><strong>Çalışma alanını dışa aktar</strong><small>Tüm proje, görev, kişi ve mind map verilerini taşınabilir JSON dosyasına kaydeder.</small></span><button className="secondary-button" onClick={onExport}><Download size={16} /> Yedek indir</button></div><div><Upload size={20} /><span><strong>Yedekten geri yükle</strong><small>Daha önce alınan bir Akış yedeğini bu cihazda açar.</small></span><input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={(event) => importFile(event.target.files?.[0])} /><button className="secondary-button" onClick={() => fileRef.current?.click()}><Upload size={16} /> Dosya seç</button></div></div></section>
+      {desktopInfo ? (
+        <section className="settings-section">
+          <div className="settings-heading"><h2>Otomatik kayıt</h2><p>Hiçbir işlem yapmanız gerekmez. Akış bütün değişiklikleri dosyaya ve yedeklere kendisi yazar.</p></div>
+          <div className="backup-panel automatic">
+            <div><HardDrive size={20} /><span><strong>Save klasörüne otomatik kaydediliyor</strong><small className="save-path">{desktopInfo.dataFile}</small></span><span className="status-chip success"><Check size={14} /> Aktif</span></div>
+            <div><ShieldCheck size={20} /><span><strong>Otomatik güvenlik kopyaları</strong><small>Her saat değişiklik varsa yeni bir kopya oluşturulur; son 60 sağlam yedek korunur.</small></span><button className="secondary-button" onClick={() => openDesktopSaveFolder()}><FolderOpen size={16} /> Save klasörünü aç</button></div>
+          </div>
+        </section>
+      ) : (
+        <section className="settings-section"><div className="settings-heading"><h2>Yedekleme</h2><p>Tarayıcı sürümünde taşınabilir bir dosya alabilirsiniz.</p></div><div className="backup-panel"><div><Download size={20} /><span><strong>Çalışma alanını dışa aktar</strong><small>Tüm proje, görev, kişi ve mind map verilerini taşınabilir JSON dosyasına kaydeder.</small></span><button className="secondary-button" onClick={onExport}><Download size={16} /> Yedek indir</button></div><div><Upload size={20} /><span><strong>Yedekten geri yükle</strong><small>Daha önce alınan bir Akış yedeğini bu cihazda açar.</small></span><input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={(event) => importFile(event.target.files?.[0])} /><button className="secondary-button" onClick={() => fileRef.current?.click()}><Upload size={16} /> Dosya seç</button></div></div></section>
+      )}
     </main>
   );
 }
