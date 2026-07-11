@@ -2,7 +2,20 @@
 
 Akış; birden fazla projeyi Kanban boardlar ve mind mapler aracılığıyla yöneten, internet bağlantısı gerektirmeyen kişisel Windows masaüstü uygulamasıdır.
 
-## Son kullanıcı olarak çalıştırma
+## Programı kullanmak istiyorsanız
+
+Kod indirmeniz veya geliştirici araçları kurmanız gerekmez:
+
+1. **[En güncel Windows kurulum dosyasını açın](https://github.com/Hamitp/kanban/releases/latest).**
+2. `Akis-Setup-...-x64.exe` dosyasını indirin.
+3. Dosyaya çift tıklayın.
+4. Kurulumdan sonra masaüstündeki **Akış** simgesini açın.
+
+İlk kez kurulum yapıyorsanız ayrıntılı anlatımı okuyun:
+
+### [Hiç bilmeyenler için adım adım Windows kurulum rehberi](docs/KURULUM_REHBERI.md)
+
+## Kısa kurulum özeti
 
 1. `Akis-Setup-0.1.0-x64.exe` kurulum dosyasını bir kez çalıştırın.
 2. Kurulumdan sonra masaüstündeki **Akış** kısayoluna çift tıklayın.
