@@ -1754,6 +1754,17 @@ select:focus-visible {
 .settings-members strong { font-size: 12.5px; }
 .settings-members small { color: var(--text-faint); font-size: 10.5px; }
 
+.member-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.member-actions .danger-ghost {
+  padding: 7px 9px;
+}
+
 .backup-panel {
   display: grid;
   gap: 0;
