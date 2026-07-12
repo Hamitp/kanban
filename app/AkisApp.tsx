@@ -46,25 +46,29 @@ import { BoardView } from "./components/BoardView";
 import { InsightsScreen } from "./components/InsightsScreen";
 import { MindMapView } from "./components/MindMapView";
 import {
-  formatTryKurus,
+  currencyCodes,
+  formatMoney,
   getPortfolioFinance,
+  getPortfolioCurrencies,
   getProjectFinanceTotals,
   getProjectStatus,
-  parseTryToKurus,
+  parseMoneyToMinor,
   transitionProjectStatus,
 } from "./projectFinance";
+import { currencyName, I18nProvider, languageName, useI18n } from "./i18n";
 import { createBoard, createMindMap, createSeedData, newId } from "./seed";
 import { countMemberAssignments, removeMemberFromWorkspace } from "./memberManagement";
 import {
   archiveWorkspace,
   createBlankWorkspace,
-  createWorkspaceStoreFromLegacy,
+  createFreshWorkspaceStore,
   deleteArchivedWorkspace,
   getActiveWorkspace,
   renameWorkspace,
   restoreWorkspace,
   switchWorkspace,
   updateActiveWorkspaceData,
+  setWorkspacePreferences,
 } from "./workspaceManagement";
 import {
   getDesktopSaveInfo,
@@ -81,6 +85,7 @@ import { getBoardFlowStats, getProjectFlowStats } from "./workspaceAnalytics";
 import type { DesktopSaveInfo } from "./desktop";
 import type {
   AppData,
+  CurrencyCode,
   ItemKind,
   KanbanBoard,
   MindMap,
@@ -92,6 +97,7 @@ import type {
   TaskCard,
   ThemeId,
   LocalWorkspace,
+  Language,
   WorkspaceStore,
 } from "./types";
 
@@ -110,6 +116,7 @@ interface ProjectDraft {
   color: string;
   clientName?: string;
   agreedAmountKurus?: number;
+  currency: CurrencyCode;
 }
 
 interface PaymentDraft {
@@ -176,6 +183,7 @@ export default function AkisApp() {
   const hydrated = useRef(false);
   const activeWorkspace = workspaceStore ? getActiveWorkspace(workspaceStore) : null;
   const data = activeWorkspace?.data ?? null;
+  const language: Language = workspaceStore?.preferences.language ?? "tr";
 
   useLayoutEffect(() => {
     latestDataRef.current = workspaceStore;
@@ -187,7 +195,7 @@ export default function AkisApp() {
         // Mark hydration before publishing the loaded store so legacy-to-v2
         // normalization is persisted immediately, even without a user action.
         hydrated.current = true;
-        setWorkspaceStore(stored ?? createWorkspaceStoreFromLegacy(createSeedData()));
+        setWorkspaceStore(stored ?? createFreshWorkspaceStore());
         const recovery = await getDesktopRecoveryInfo();
         if (recovery?.recovered) {
           setToast({ message: "Son sağlam otomatik kopya güvenle geri yüklendi" });
@@ -211,6 +219,7 @@ export default function AkisApp() {
   useEffect(() => {
     if (!workspaceStore || !data || !hydrated.current) return;
     document.documentElement.dataset.theme = data.theme;
+    document.documentElement.lang = language;
     let cancelled = false;
     let retryTimer: number | undefined;
     const persist = () => {
@@ -235,7 +244,7 @@ export default function AkisApp() {
       window.clearTimeout(timer);
       if (retryTimer) window.clearTimeout(retryTimer);
     };
-  }, [workspaceStore, data]);
+  }, [workspaceStore, data, language]);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -284,7 +293,7 @@ export default function AkisApp() {
     pastRef.current = pastRef.current.slice(0, -1);
     futureRef.current = [data, ...futureRef.current.slice(0, 39)];
     setWorkspaceStore((current) => current ? updateActiveWorkspaceData(current, () => previous, now()) : current);
-    setToast({ message: "Son işlem geri alındı" });
+    setToast({ message: language === "tr" ? "Son işlem geri alındı" : "Last action undone" });
     setHistoryVersion((value) => value + 1);
   }
 
@@ -294,7 +303,7 @@ export default function AkisApp() {
     futureRef.current = futureRef.current.slice(1);
     pastRef.current = [...pastRef.current.slice(-39), data];
     setWorkspaceStore((current) => current ? updateActiveWorkspaceData(current, () => next, now()) : current);
-    setToast({ message: "İşlem yeniden uygulandı" });
+    setToast({ message: language === "tr" ? "İşlem yeniden uygulandı" : "Action redone" });
     setHistoryVersion((value) => value + 1);
   }
 
@@ -304,15 +313,38 @@ export default function AkisApp() {
     return () => window.clearTimeout(timer);
   }, [toast]);
 
+  function chooseLanguage(nextLanguage: Language) {
+    const stamp = now();
+    setWorkspaceStore((current) => {
+      if (!current) return current;
+      let next = setWorkspacePreferences(current, { language: nextLanguage, freshInstallation: false }, stamp);
+      if (current.preferences.freshInstallation) {
+        const seeded = createSeedData(nextLanguage);
+        next = {
+          ...next,
+          workspaces: next.workspaces.map((workspace) => workspace.id === next.activeWorkspaceId
+            ? {
+                ...workspace,
+                name: seeded.workspaceName,
+                updatedAt: stamp,
+                data: { ...seeded, workspaceName: seeded.workspaceName, updatedAt: stamp },
+              }
+            : workspace),
+        };
+      }
+      return next;
+    });
+  }
+
   if (fatalLoadError) {
     return (
       <div className="recovery-screen">
         <div className="recovery-card">
           <span className="recovery-icon"><ShieldCheck size={26} /></span>
-          <span className="eyebrow">VERİLERİNİZ KORUNDU</span>
-          <h1>Çalışma alanı açılamadı</h1>
-          <p>Akış, sorunlu dosyanın üzerine yeni veri yazmadı. Save klasörünüzdeki son sağlam kopyayı inceleyebilmeniz için veriler olduğu gibi korundu.</p>
-          <button className="primary-button large" onClick={() => openDesktopSaveFolder()}><FolderOpen size={17} /> Save klasörünü aç</button>
+          <span className="eyebrow">VERİLERİNİZ KORUNDU · YOUR DATA IS SAFE</span>
+          <h1>Çalışma alanı açılamadı · Workspace could not be opened</h1>
+          <p>Akış sorunlu dosyanın üzerine yazmadı. Flow did not overwrite the problematic file; your Save folder remains unchanged.</p>
+          <button className="primary-button large" onClick={() => openDesktopSaveFolder()}><FolderOpen size={17} /> Save klasörünü aç · Open Save folder</button>
         </div>
       </div>
     );
@@ -322,9 +354,13 @@ export default function AkisApp() {
     return (
       <div className="app-loading">
         <div className="brand-mark"><Blocks size={22} /></div>
-        <div><strong>Akış hazırlanıyor</strong><span>Çalışma alanınız yerelden açılıyor...</span></div>
+        <div><strong>Akış hazırlanıyor · Getting Flow ready</strong><span>Çalışma alanınız yerelden açılıyor · Opening your local workspace...</span></div>
       </div>
     );
+  }
+
+  if (!workspaceStore?.preferences.language) {
+    return <LanguageOnboarding onChoose={chooseLanguage} />;
   }
 
   const profileName = resolveProfileName(data);
@@ -360,7 +396,7 @@ export default function AkisApp() {
     if (!target) return;
     setWorkspaceStore((current) => current ? switchWorkspace(current, workspaceId, now()) : current);
     clearWorkspaceContext();
-    showToast(`${target.name} çalışma alanına geçildi`);
+    showToast(language === "tr" ? `${target.name} çalışma alanına geçildi` : `Switched to ${target.name} workspace`);
   }
 
   function saveWorkspaceItem(name: string, color: string, workspaceId?: string) {
@@ -371,14 +407,14 @@ export default function AkisApp() {
       workspace.id !== workspaceId && workspace.name.toLocaleLowerCase("tr-TR") === normalizedName,
     );
     if (!cleanName || duplicate) {
-      if (duplicate) window.alert("Bu adla bir çalışma alanı zaten var.");
+      if (duplicate) window.alert(language === "tr" ? "Bu adla bir çalışma alanı zaten var." : "A workspace with this name already exists.");
       return;
     }
     const stamp = now();
     if (workspaceId) {
       setWorkspaceStore((current) => current ? renameWorkspace(current, workspaceId, cleanName, stamp, color) : current);
       setModal(null);
-      showToast("Çalışma alanı adı güncellendi");
+      showToast(language === "tr" ? "Çalışma alanı adı güncellendi" : "Workspace name updated");
       return;
     }
     const workspace = createBlankWorkspace(newId(), cleanName, color, data, stamp);
@@ -389,7 +425,7 @@ export default function AkisApp() {
       updatedAt: stamp,
     } : current);
     clearWorkspaceContext();
-    showToast(`${cleanName} çalışma alanı oluşturuldu`);
+    showToast(language === "tr" ? `${cleanName} çalışma alanı oluşturuldu` : `${cleanName} workspace created`);
   }
 
   function archiveWorkspaceItem(workspaceId: string) {
@@ -397,11 +433,11 @@ export default function AkisApp() {
     const workspace = workspaceStore.workspaces.find((item) => item.id === workspaceId && !item.archived);
     const activeCount = workspaceStore.workspaces.filter((item) => !item.archived).length;
     if (!workspace || activeCount <= 1) return;
-    if (!window.confirm(`${workspace.name} çalışma alanı arşivlensin mi? İçerikleri korunacak ve daha sonra geri getirilebilecek.`)) return;
+    if (!window.confirm(language === "tr" ? `${workspace.name} çalışma alanı arşivlensin mi? İçerikleri korunacak ve daha sonra geri getirilebilecek.` : `Archive the ${workspace.name} workspace? Its contents will be preserved and can be restored later.`)) return;
     const switching = workspaceStore.activeWorkspaceId === workspaceId;
     setWorkspaceStore((current) => current ? archiveWorkspace(current, workspaceId, now()) : current);
     if (switching) clearWorkspaceContext();
-    showToast(`${workspace.name} arşivlendi`);
+    showToast(language === "tr" ? `${workspace.name} arşivlendi` : `${workspace.name} archived`);
   }
 
   function restoreWorkspaceItem(workspaceId: string) {
@@ -416,10 +452,10 @@ export default function AkisApp() {
     if (!workspaceStore) return;
     const workspace = workspaceStore.workspaces.find((item) => item.id === workspaceId && item.archived);
     if (!workspace) return;
-    const summary = `${workspace.data.projects.length} proje, ${workspace.data.boards.length} Kanban panosu ve ${workspace.data.mindMaps.length} zihin haritası`;
-    if (!window.confirm(`${workspace.name} kalıcı olarak silinsin mi?\n\n${summary} silinecek. Bu işlem geri alınamaz.`)) return;
+    const summary = language === "tr" ? `${workspace.data.projects.length} proje, ${workspace.data.boards.length} Kanban panosu ve ${workspace.data.mindMaps.length} zihin haritası` : `${workspace.data.projects.length} projects, ${workspace.data.boards.length} Kanban boards and ${workspace.data.mindMaps.length} mind maps`;
+    if (!window.confirm(language === "tr" ? `${workspace.name} kalıcı olarak silinsin mi?\n\n${summary} silinecek. Bu işlem geri alınamaz.` : `Permanently delete ${workspace.name}?\n\n${summary} will be deleted. This cannot be undone.`)) return;
     setWorkspaceStore((current) => current ? deleteArchivedWorkspace(current, workspaceId, now()) : current);
-    showToast(`${workspace.name} kalıcı olarak silindi`);
+    showToast(language === "tr" ? `${workspace.name} kalıcı olarak silindi` : `${workspace.name} permanently deleted`);
   }
 
   function saveProjectItem(draft: ProjectDraft, projectId?: string) {
@@ -436,7 +472,7 @@ export default function AkisApp() {
             color: draft.color,
             clientName: draft.clientName,
             finance: draft.agreedAmountKurus
-              ? { currency: "TRY", agreedAmountKurus: draft.agreedAmountKurus, payments }
+              ? { currency: payments.length ? project.finance?.currency ?? draft.currency : draft.currency, agreedAmountKurus: draft.agreedAmountKurus, payments }
               : payments.length
                 ? project.finance
                 : undefined,
@@ -445,7 +481,7 @@ export default function AkisApp() {
         }),
       }));
       setModal(null);
-      showToast("Proje bilgileri güncellendi", true);
+      showToast(language === "tr" ? "Proje bilgileri güncellendi" : "Project details updated", true);
       return;
     }
     const project: Project = {
@@ -456,7 +492,7 @@ export default function AkisApp() {
       clientName: draft.clientName,
       status: "active",
       finance: draft.agreedAmountKurus
-        ? { currency: "TRY", agreedAmountKurus: draft.agreedAmountKurus, payments: [] }
+        ? { currency: draft.currency, agreedAmountKurus: draft.agreedAmountKurus, payments: [] }
         : undefined,
       archived: false,
       createdAt: now(),
@@ -465,7 +501,7 @@ export default function AkisApp() {
     commit((current) => ({ ...current, projects: [...current.projects, project] }));
     setModal(null);
     navigate({ kind: "project", id: project.id });
-    showToast("Yeni proje hazır");
+    showToast(language === "tr" ? "Yeni proje hazır" : "New project ready");
   }
 
   function saveProjectPayment(projectId: string, draft: PaymentDraft, paymentId?: string) {
@@ -494,22 +530,22 @@ export default function AkisApp() {
       }),
     }));
     setModal(null);
-    showToast(paymentId ? "Tahsilat güncellendi" : "Tahsilat kaydedildi", true);
+    showToast(paymentId ? language === "tr" ? "Tahsilat güncellendi" : "Payment updated" : language === "tr" ? "Tahsilat kaydedildi" : "Payment recorded", true);
   }
 
   function createItem(kind: ItemKind, projectId: string, title: string) {
     if (kind === "board") {
-      const board = createBoard(projectId, title);
+      const board = createBoard(projectId, title, language);
       commit((current) => ({ ...current, boards: [...current.boards, board] }));
       setModal(null);
       navigate({ kind: "board", id: board.id });
     } else {
-      const map = createMindMap(projectId, title);
+      const map = createMindMap(projectId, title, language);
       commit((current) => ({ ...current, mindMaps: [...current.mindMaps, map] }));
       setModal(null);
       navigate({ kind: "mindmap", id: map.id });
     }
-    showToast(kind === "board" ? "Yeni Kanban panosu hazır" : "Yeni zihin haritası hazır");
+    showToast(kind === "board" ? language === "tr" ? "Yeni Kanban panosu hazır" : "New Kanban board ready" : language === "tr" ? "Yeni zihin haritası hazır" : "New mind map ready");
   }
 
   function archiveItem(kind: ItemKind, id: string) {
@@ -519,7 +555,7 @@ export default function AkisApp() {
         : { ...current, mindMaps: current.mindMaps.map((item) => (item.id === id ? { ...item, archived: true } : item)) },
     );
     navigate({ kind: "home" });
-    showToast("Çalışma arşivlendi", true);
+    showToast(language === "tr" ? "Çalışma arşivlendi" : "Work archived", true);
   }
 
   function duplicateItem(kind: ItemKind, id: string, targetProjectId: string, structureOnly: boolean) {
@@ -584,7 +620,7 @@ export default function AkisApp() {
       setModal(null);
       navigate({ kind: "mindmap", id: copy.id });
     }
-    showToast("Bağımsız bir kopya oluşturuldu");
+    showToast(language === "tr" ? "Bağımsız bir kopya oluşturuldu" : "Independent copy created");
   }
 
   function addGlobalLabel(name: string, color: string) {
@@ -596,6 +632,7 @@ export default function AkisApp() {
   const shellScreen = !(currentBoard || currentMap);
 
   return (
+    <I18nProvider language={language}>
     <div className={`app-shell ${sidebarOpen ? "sidebar-open" : "sidebar-collapsed"}`}>
       <Sidebar
         open={sidebarOpen}
@@ -906,7 +943,7 @@ export default function AkisApp() {
                     : map,
                 ),
               }));
-              showToast("Harita otomatik düzenlendi", true);
+              showToast(language === "tr" ? "Harita otomatik düzenlendi" : "Map arranged automatically", true);
             }}
             onZoomChange={(zoom) =>
               commit(
@@ -928,6 +965,8 @@ export default function AkisApp() {
             data={data}
             workspaces={workspaceStore!.workspaces}
             activeWorkspaceId={workspaceStore!.activeWorkspaceId}
+            language={language}
+            defaultCurrency={workspaceStore!.preferences.defaultCurrency}
             onNavigate={navigate}
             onModal={setModal}
             onArchiveItem={archiveItem}
@@ -939,7 +978,7 @@ export default function AkisApp() {
                 ),
               }));
               navigate({ kind: "home" });
-              showToast("Proje arşivlendi", true);
+              showToast(language === "tr" ? "Proje arşivlendi" : "Project archived", true);
             }}
             onEditProject={(projectId) => setModal({ type: "project", projectId })}
             onProjectStatus={(projectId, status) => {
@@ -955,8 +994,8 @@ export default function AkisApp() {
                 status === "active"
                   ? "Proje yeniden aktif"
                   : status === "completed"
-                    ? "Proje tamamlandı olarak işaretlendi"
-                    : "Müşteriye teslim kaydedildi",
+                    ? language === "tr" ? "Proje tamamlandı olarak işaretlendi" : "Project marked complete"
+                    : language === "tr" ? "Müşteriye teslim kaydedildi" : "Client delivery recorded",
                 true,
               );
             }}
@@ -965,7 +1004,9 @@ export default function AkisApp() {
             onDeletePayment={(projectId, paymentId) => {
               const project = data.projects.find((item) => item.id === projectId);
               const payment = project?.finance?.payments.find((item) => item.id === paymentId);
-              if (!payment || !window.confirm(`${formatTryKurus(payment.amountKurus, true)} tutarındaki tahsilat kaydı silinsin mi?`)) return;
+              if (!payment || !project?.finance) return;
+              const paymentAmount = formatMoney(payment.amountKurus, project.finance.currency, language, true);
+              if (!window.confirm(language === "tr" ? `${paymentAmount} tutarındaki tahsilat kaydı silinsin mi?` : `Delete the ${paymentAmount} payment record?`)) return;
               commit((current) => ({
                 ...current,
                 projects: current.projects.map((item) =>
@@ -974,7 +1015,7 @@ export default function AkisApp() {
                     : item,
                 ),
               }));
-              showToast("Tahsilat kaydı silindi", true);
+              showToast(language === "tr" ? "Tahsilat kaydı silindi" : "Payment record deleted", true);
             }}
             onRestore={(kind, id) => {
               commit((current) => {
@@ -982,7 +1023,7 @@ export default function AkisApp() {
                 if (kind === "board") return { ...current, boards: current.boards.map((item) => (item.id === id ? { ...item, archived: false } : item)) };
                 return { ...current, mindMaps: current.mindMaps.map((item) => (item.id === id ? { ...item, archived: false } : item)) };
               });
-              showToast("Çalışma geri getirildi", true);
+              showToast(language === "tr" ? "Çalışma geri getirildi" : "Work restored", true);
             }}
             onDelete={(kind, id) => {
               const message = kind === "project"
@@ -1008,7 +1049,7 @@ export default function AkisApp() {
                 if (kind === "board") return { ...current, boards: current.boards.filter((item) => item.id !== id) };
                 return { ...current, mindMaps: current.mindMaps.filter((item) => item.id !== id) };
               }, false);
-              showToast("Kalıcı olarak silindi");
+              showToast(language === "tr" ? "Kalıcı olarak silindi" : "Permanently deleted");
             }}
             onQuickTask={(boardId, title) => {
               const board = data.boards.find((item) => item.id === boardId);
@@ -1038,9 +1079,11 @@ export default function AkisApp() {
                     : item,
                 ),
               }));
-              showToast("Görev, toplam görev listesine eklendi");
+              showToast(language === "tr" ? "Görev, toplam görev listesine eklendi" : "Task added to the total task list");
             }}
             onTheme={(theme) => commit((current) => ({ ...current, theme }), false)}
+            onLanguage={(nextLanguage) => setWorkspaceStore((current) => current ? setWorkspacePreferences(current, { language: nextLanguage }, now()) : current)}
+            onDefaultCurrency={(currency) => setWorkspaceStore((current) => current ? setWorkspacePreferences(current, { defaultCurrency: currency }, now()) : current)}
             onWorkspaceName={(workspaceName) => saveWorkspaceItem(workspaceName, activeWorkspace!.color, activeWorkspace!.id)}
             onProfileName={(profileName) => commit((current) => ({ ...current, profileName }))}
             onNewMember={() => setModal({ type: "member" })}
@@ -1076,7 +1119,7 @@ export default function AkisApp() {
                 ? updateActiveWorkspaceData(current, () => ({ ...imported, workspaceName: activeWorkspace!.name }), now())
                 : current);
               setHistoryVersion((value) => value + 1);
-              showToast("Yedek başarıyla geri yüklendi", true);
+              showToast(language === "tr" ? "Yedek başarıyla geri yüklendi" : "Backup restored successfully", true);
             }}
             onNewWorkspace={() => setModal({ type: "workspace" })}
             onEditWorkspace={(workspaceId) => setModal({ type: "workspace", workspaceId })}
@@ -1091,6 +1134,7 @@ export default function AkisApp() {
       {modal?.type === "project" && (
         <ProjectModal
           project={modal.projectId ? data.projects.find((project) => project.id === modal.projectId) : undefined}
+          defaultCurrency={workspaceStore!.preferences.defaultCurrency}
           onClose={() => setModal(null)}
           onSave={(draft) => saveProjectItem(draft, modal.projectId)}
         />
@@ -1147,7 +1191,7 @@ export default function AkisApp() {
               members: [...current.members, { id: newId(), name, initials, color, active: true }],
             }));
             setModal(null);
-            showToast("Kişi çalışma alanına eklendi");
+            showToast(language === "tr" ? "Kişi çalışma alanına eklendi" : "Person added to workspace");
           }}
         />
       )}
@@ -1164,11 +1208,30 @@ export default function AkisApp() {
         <div className="toast" role="status">
           <CheckCircle2 size={17} />
           <span>{toast.message}</span>
-          {toast.undo && <button onClick={undo}>Geri al</button>}
-          <button className="toast-close" onClick={() => setToast(null)} aria-label="Bildirimi kapat"><X size={15} /></button>
+          {toast.undo && <button onClick={undo}>{language === "tr" ? "Geri al" : "Undo"}</button>}
+          <button className="toast-close" onClick={() => setToast(null)} aria-label={language === "tr" ? "Bildirimi kapat" : "Dismiss notification"}><X size={15} /></button>
         </div>
       )}
     </div>
+    </I18nProvider>
+  );
+}
+
+function LanguageOnboarding({ onChoose }: { onChoose: (language: Language) => void }) {
+  return (
+    <main className="language-onboarding">
+      <section className="language-card" aria-labelledby="language-title">
+        <div className="brand-mark"><Blocks size={24} /></div>
+        <span className="eyebrow">AKIŞ · FLOW</span>
+        <h1 id="language-title">Dilinizi seçin · Choose your language</h1>
+        <p>Bu seçimi daha sonra Ayarlar’dan değiştirebilirsiniz.<br />You can change this later in Settings.</p>
+        <div className="language-options">
+          <button onClick={() => onChoose("tr")}><span>TR</span><strong>Türkçe</strong><small>Uygulamayı Türkçe kullan</small><ChevronRight size={18} /></button>
+          <button onClick={() => onChoose("en")}><span>EN</span><strong>English</strong><small>Use the application in English</small><ChevronRight size={18} /></button>
+        </div>
+        <div className="language-local-note"><ShieldCheck size={17} /><span>Verileriniz bu cihazda kalır · Your data stays on this device</span></div>
+      </section>
+    </main>
   );
 }
 
@@ -1195,24 +1258,25 @@ function Sidebar({
   onSwitchWorkspace: (id: string) => void;
   onNewWorkspace: () => void;
 }) {
+  const { t, language } = useI18n();
   const [workspaceMenu, setWorkspaceMenu] = useState(false);
   const activeWorkspace = workspaces.find((workspace) => workspace.id === activeWorkspaceId);
   const visibleWorkspaces = workspaces.filter((workspace) => !workspace.archived);
   const nav = [
-    { kind: "home" as const, label: "Genel Bakış", icon: Home },
-    { kind: "projects" as const, label: "Projeler", icon: FolderKanban },
-    { kind: "boards" as const, label: "Kanban Panoları", icon: LayoutDashboard },
-    { kind: "mindmaps" as const, label: "Zihin Haritaları", icon: MapIcon },
-    { kind: "insights" as const, label: "İçgörüler", icon: BarChart3 },
+    { kind: "home" as const, label: t("Genel Bakış"), icon: Home },
+    { kind: "projects" as const, label: t("Projeler"), icon: FolderKanban },
+    { kind: "boards" as const, label: t("Kanban Panoları"), icon: LayoutDashboard },
+    { kind: "mindmaps" as const, label: t("Zihin Haritaları"), icon: MapIcon },
+    { kind: "insights" as const, label: t("İçgörüler"), icon: BarChart3 },
   ];
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
-        <button className="brand-button" onClick={() => onNavigate({ kind: "home" })} aria-label="Genel Bakışa git">
+        <button className="brand-button" onClick={() => onNavigate({ kind: "home" })} aria-label={t("Genel Bakışa git")}>
           <span className="brand-mark"><Blocks size={20} /></span>
-          {open && <span><strong>Akış</strong><small>Yerel çalışma alanı</small></span>}
+          {open && <span><strong>Akış</strong><small>{t("Yerel çalışma alanı")}</small></span>}
         </button>
-        <button className="icon-button sidebar-toggle" onClick={onToggle} aria-label={open ? "Menüyü daralt" : "Menüyü genişlet"}>
+        <button className="icon-button sidebar-toggle" onClick={onToggle} aria-label={t(open ? "Menüyü daralt" : "Menüyü genişlet")}>
           {open ? <PanelLeftClose size={17} /> : <PanelLeftOpen size={17} />}
         </button>
       </div>
@@ -1220,17 +1284,17 @@ function Sidebar({
         <button
           className="workspace-switcher-button"
           onClick={() => { if (!open) { onToggle(); setWorkspaceMenu(true); } else setWorkspaceMenu((value) => !value); }}
-          aria-label="Çalışma alanını değiştir"
+          aria-label={t("Çalışma alanını değiştir")}
           aria-expanded={workspaceMenu}
           title={!open ? activeWorkspace?.name : undefined}
         >
           <i style={{ background: activeWorkspace?.color }} />
-          {open && <span><small>ÇALIŞMA ALANI</small><strong>{activeWorkspace?.name}</strong></span>}
+          {open && <span><small>{t("ÇALIŞMA ALANI")}</small><strong>{activeWorkspace?.name}</strong></span>}
           {open && <ChevronsUpDown size={15} />}
         </button>
         {workspaceMenu && (
           <div className="workspace-switcher-menu" role="menu">
-            <header>Çalışma alanları</header>
+            <header>{t("Çalışma alanları")}</header>
             {visibleWorkspaces.map((workspace) => (
               <button key={workspace.id} role="menuitem" className={workspace.id === activeWorkspaceId ? "active" : ""} onClick={() => { setWorkspaceMenu(false); onSwitchWorkspace(workspace.id); }}>
                 <i style={{ background: workspace.color }} />
@@ -1238,11 +1302,11 @@ function Sidebar({
                 {workspace.id === activeWorkspaceId && <Check size={15} />}
               </button>
             ))}
-            <button role="menuitem" className="new-workspace" onClick={() => { setWorkspaceMenu(false); onNewWorkspace(); }}><Plus size={15} /> Yeni çalışma alanı</button>
+            <button role="menuitem" className="new-workspace" onClick={() => { setWorkspaceMenu(false); onNewWorkspace(); }}><Plus size={15} /> {t("Yeni çalışma alanı")}</button>
           </div>
         )}
       </div>
-      <nav className="main-nav" aria-label="Ana menü">
+      <nav className="main-nav" aria-label={t("Ana menü")}>
         {nav.map((item) => {
           const Icon = item.icon;
           const active = screen.kind === item.kind
@@ -1258,12 +1322,12 @@ function Sidebar({
       </nav>
       {open && (
         <div className="sidebar-projects">
-          <header><span>PROJELER</span><button onClick={onNewProject} aria-label="Yeni proje"><Plus size={15} /></button></header>
+          <header><span>{language === "tr" ? "PROJELER" : "PROJECTS"}</span><button onClick={onNewProject} aria-label={t("Yeni proje")}><Plus size={15} /></button></header>
           {projects.slice(0, 6).map((project) => (
             <button
               key={project.id}
               className={screen.kind === "project" && screen.id === project.id ? "active" : ""}
-              aria-label={`${project.name} projesini aç`}
+              aria-label={language === "tr" ? `${project.name} projesini aç` : `Open ${project.name} project`}
               aria-current={screen.kind === "project" && screen.id === project.id ? "page" : undefined}
               onClick={() => onNavigate({ kind: "project", id: project.id })}
             >
@@ -1274,11 +1338,11 @@ function Sidebar({
         </div>
       )}
       <div className="sidebar-bottom">
-        <button className={screen.kind === "archive" ? "active" : ""} aria-label="Arşiv" aria-current={screen.kind === "archive" ? "page" : undefined} onClick={() => onNavigate({ kind: "archive" })} title={!open ? "Arşiv" : undefined}>
-          <Archive size={18} /> {open && <span>Arşiv</span>}
+        <button className={screen.kind === "archive" ? "active" : ""} aria-label={t("Arşiv")} aria-current={screen.kind === "archive" ? "page" : undefined} onClick={() => onNavigate({ kind: "archive" })} title={!open ? t("Arşiv") : undefined}>
+          <Archive size={18} /> {open && <span>{t("Arşiv")}</span>}
         </button>
-        <button className={screen.kind === "settings" ? "active" : ""} aria-label="Ayarlar" aria-current={screen.kind === "settings" ? "page" : undefined} onClick={() => onNavigate({ kind: "settings" })} title={!open ? "Ayarlar" : undefined}>
-          <Settings2 size={18} /> {open && <span>Ayarlar</span>}
+        <button className={screen.kind === "settings" ? "active" : ""} aria-label={t("Ayarlar")} aria-current={screen.kind === "settings" ? "page" : undefined} onClick={() => onNavigate({ kind: "settings" })} title={!open ? t("Ayarlar") : undefined}>
+          <Settings2 size={18} /> {open && <span>{t("Ayarlar")}</span>}
         </button>
       </div>
     </aside>
@@ -1323,16 +1387,17 @@ function Topbar({
   onUndo: () => void;
   onRedo: () => void;
 }) {
-  const normalized = query.trim().toLocaleLowerCase("tr");
+  const { t, language, locale } = useI18n();
+  const normalized = query.trim().toLocaleLowerCase(locale);
   const visibleProjects = projects.filter((project) => !project.archived);
   const visibleProjectIds = new Set(visibleProjects.map((project) => project.id));
   const visibleBoards = boards.filter((board) => !board.archived && visibleProjectIds.has(board.projectId));
   const visibleMindMaps = mindMaps.filter((map) => !map.archived && visibleProjectIds.has(map.projectId));
   const results = normalized
     ? [
-        ...visibleProjects.filter((item) => `${item.name} ${item.clientName ?? ""}`.toLocaleLowerCase("tr").includes(normalized)).map((item) => ({ key: `p-${item.id}`, title: item.name, meta: "Proje", screen: { kind: "project", id: item.id } as Screen, icon: FolderKanban })),
+        ...visibleProjects.filter((item) => `${item.name} ${item.clientName ?? ""}`.toLocaleLowerCase(locale).includes(normalized)).map((item) => ({ key: `p-${item.id}`, title: item.name, meta: t("Proje"), screen: { kind: "project", id: item.id } as Screen, icon: FolderKanban })),
         ...visibleBoards.filter((item) => `${item.title} ${item.description}`.toLocaleLowerCase("tr").includes(normalized)).map((item) => ({ key: `b-${item.id}`, title: item.title, meta: "Kanban panosu", screen: { kind: "board", id: item.id } as Screen, icon: LayoutDashboard })),
-        ...visibleMindMaps.filter((item) => `${item.title} ${item.description}`.toLocaleLowerCase("tr").includes(normalized)).map((item) => ({ key: `m-${item.id}`, title: item.title, meta: "Zihin haritası", screen: { kind: "mindmap", id: item.id } as Screen, icon: MapIcon })),
+        ...visibleMindMaps.filter((item) => `${item.title} ${item.description}`.toLocaleLowerCase(locale).includes(normalized)).map((item) => ({ key: `m-${item.id}`, title: item.title, meta: t("Zihin haritası"), screen: { kind: "mindmap", id: item.id } as Screen, icon: MapIcon })),
         ...visibleMindMaps.flatMap((map) =>
           map.nodes
             .filter((node) => `${node.title} ${node.note}`.toLocaleLowerCase("tr").includes(normalized))
@@ -1341,7 +1406,7 @@ function Topbar({
         ...visibleBoards.flatMap((board) =>
           Object.values(board.tasks)
             .filter((task) => `${task.title} ${task.description}`.toLocaleLowerCase("tr").includes(normalized))
-            .map((task) => ({ key: `t-${task.id}`, title: task.title, meta: `${board.title} · Görev`, screen: { kind: "board", id: board.id } as Screen, icon: ListTodo })),
+            .map((task) => ({ key: `t-${task.id}`, title: task.title, meta: `${board.title} · ${t("Görev")}`, screen: { kind: "board", id: board.id } as Screen, icon: ListTodo })),
         ),
       ].slice(0, 8)
     : [];
@@ -1350,7 +1415,7 @@ function Topbar({
     if (screen.kind === "project") return projects.find((item) => item.id === screen.id)?.name;
     if (screen.kind === "board") return boards.find((item) => item.id === screen.id)?.title;
     if (screen.kind === "mindmap") return mindMaps.find((item) => item.id === screen.id)?.title;
-    const names: Record<string, string> = { home: "Genel Bakış", projects: "Projeler", boards: "Kanban Panoları", mindmaps: "Zihin Haritaları", insights: "İçgörüler", archive: "Arşiv", settings: "Ayarlar" };
+    const names: Record<string, string> = { home: t("Genel Bakış"), projects: t("Projeler"), boards: t("Kanban Panoları"), mindmaps: t("Zihin Haritaları"), insights: t("İçgörüler"), archive: t("Arşiv"), settings: t("Ayarlar") };
     return names[screen.kind];
   })();
 
@@ -1364,34 +1429,34 @@ function Topbar({
             value={query}
             onChange={(event) => onQuery(event.target.value)}
             onFocus={() => onSearchOpen(true)}
-            placeholder="Her yerde ara..."
+            placeholder={language === "tr" ? "Her yerde ara..." : "Search everywhere..."}
             role="combobox"
             aria-autocomplete="list"
-            aria-label="Çalışma alanında ara"
+            aria-label={t("Çalışma alanında ara")}
             aria-expanded={searchOpen}
             aria-controls="global-search-results"
           />
           <kbd>Ctrl K</kbd>
         </label>
         {searchOpen && (
-          <div id="global-search-results" className="search-popover" role="dialog" aria-label="Arama sonuçları">
-            <header><span>{normalized ? `“${query}” için sonuçlar` : "Proje, görev veya fikir arayın"}</span><button onClick={() => onSearchOpen(false)} aria-label="Aramayı kapat"><X size={15} /></button></header>
+          <div id="global-search-results" className="search-popover" role="dialog" aria-label={t("Arama sonuçları")}>
+            <header><span>{normalized ? language === "tr" ? `“${query}” için sonuçlar` : `Results for “${query}”` : t("Proje, görev veya fikir arayın")}</span><button onClick={() => onSearchOpen(false)} aria-label={t("Aramayı kapat")}><X size={15} /></button></header>
             {results.map((result) => {
               const Icon = result.icon;
               return <button key={result.key} onClick={() => { onNavigate(result.screen); onSearchOpen(false); }}><Icon size={17} /><span><strong>{result.title}</strong><small>{result.meta}</small></span><ArrowRight size={15} /></button>;
             })}
-            {normalized && results.length === 0 && <div className="empty-search">Eşleşen sonuç bulunamadı.</div>}
+            {normalized && results.length === 0 && <div className="empty-search">{t("Eşleşen sonuç bulunamadı.")}</div>}
           </div>
         )}
       </div>
       <div className="topbar-actions">
         <div className={`save-indicator ${saveState}`} role={saveState === "error" ? "alert" : "status"} aria-live="polite">
-          <i /> {saveState === "saving" ? "Kaydediliyor" : saveState === "error" ? "Kaydedilemedi · yeniden deneniyor" : `${isDesktopRuntime() ? "Save klasörüne kaydedildi" : "Yerelde kayıtlı"}${savedAt ? ` · ${savedAt.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}` : ""}`}
-          {saveState === "error" && isDesktopRuntime() && <button className="save-error-action" onClick={() => openDesktopSaveFolder()}>Save klasörü</button>}
+          <i /> {saveState === "saving" ? t("Kaydediliyor") : saveState === "error" ? t("Kaydedilemedi · yeniden deneniyor") : `${t(isDesktopRuntime() ? "Save klasörüne kaydedildi" : "Yerelde kayıtlı")}${savedAt ? ` · ${savedAt.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })}` : ""}`}
+          {saveState === "error" && isDesktopRuntime() && <button className="save-error-action" onClick={() => openDesktopSaveFolder()}>{t("Save klasörü")}</button>}
         </div>
-        <button className="icon-button" onClick={onUndo} disabled={!canUndo} aria-label="Geri al"><Undo2 size={17} /></button>
-        <button className="icon-button" onClick={onRedo} disabled={!canRedo} aria-label="Yinele"><Redo2 size={17} /></button>
-        <span className="user-avatar" role="img" aria-label={profileName ? `${profileName} profili` : "Akış profili"} title={profileName || "Akış"}>{getProfileInitials(profileName)}</span>
+        <button className="icon-button" onClick={onUndo} disabled={!canUndo} aria-label={t("Geri al")}><Undo2 size={17} /></button>
+        <button className="icon-button" onClick={onRedo} disabled={!canRedo} aria-label={t("Yinele")}><Redo2 size={17} /></button>
+        <span className="user-avatar" role="img" aria-label={profileName ? language === "tr" ? `${profileName} profili` : `${profileName} profile` : t("Akış profili")} title={profileName || "Akış"}>{getProfileInitials(profileName)}</span>
       </div>
     </header>
   );
@@ -1402,6 +1467,8 @@ function ShellContent({
   data,
   workspaces,
   activeWorkspaceId,
+  language,
+  defaultCurrency,
   onNavigate,
   onModal,
   onArchiveItem,
@@ -1415,6 +1482,8 @@ function ShellContent({
   onDelete,
   onQuickTask,
   onTheme,
+  onLanguage,
+  onDefaultCurrency,
   onWorkspaceName,
   onProfileName,
   onNewMember,
@@ -1433,6 +1502,8 @@ function ShellContent({
   data: AppData;
   workspaces: LocalWorkspace[];
   activeWorkspaceId: string;
+  language: Language;
+  defaultCurrency: CurrencyCode;
   onNavigate: (screen: Screen) => void;
   onModal: (modal: ModalState) => void;
   onArchiveItem: (kind: ItemKind, id: string) => void;
@@ -1446,6 +1517,8 @@ function ShellContent({
   onDelete: (kind: "project" | ItemKind, id: string) => void;
   onQuickTask: (boardId: string, title: string) => void;
   onTheme: (theme: ThemeId) => void;
+  onLanguage: (language: Language) => void;
+  onDefaultCurrency: (currency: CurrencyCode) => void;
   onWorkspaceName: (name: string) => void;
   onProfileName: (name: string) => void;
   onNewMember: () => void;
@@ -1460,6 +1533,7 @@ function ShellContent({
   onRestoreWorkspace: (id: string) => void;
   onDeleteWorkspace: (id: string) => void;
 }) {
+  const { t } = useI18n();
   if (screen.kind === "home") {
     return (
       <HomeScreen
@@ -1472,7 +1546,7 @@ function ShellContent({
   }
   if (screen.kind === "project") {
     const project = data.projects.find((item) => item.id === screen.id);
-    if (!project) return <main className="shell-page missing-item-page"><EmptyState title="Proje bulunamadı" description="Bu proje kaldırılmış veya arşivlenmiş olabilir." actionLabel="Projelere dön" onAction={() => onNavigate({ kind: "projects" })} /></main>;
+    if (!project) return <main className="shell-page missing-item-page"><EmptyState title={t("Proje bulunamadı")} description={t("Bu proje kaldırılmış veya arşivlenmiş olabilir.")} actionLabel={t("Projelere dön")} onAction={() => onNavigate({ kind: "projects" })} /></main>;
     return (
       <ProjectScreen
         project={project}
@@ -1495,16 +1569,16 @@ function ShellContent({
     const projects = data.projects.filter((project) => !project.archived);
     return (
       <LibraryScreen
-        title="Projeler"
-        description="Bütün çalışma alanlarınız tek bakışta."
-        actionLabel="Yeni proje"
+        title={t("Projeler")}
+        description={t("Bütün çalışma alanlarınız tek bakışta.")}
+        actionLabel={t("Yeni proje")}
         onAction={() => onModal({ type: "project" })}
       >
         <div className="project-grid">
           {projects.map((project) => (
             <ProjectCard key={project.id} project={project} data={data} onOpen={() => onNavigate({ kind: "project", id: project.id })} />
           ))}
-          {projects.length === 0 && <EmptyState title="Henüz proje yok" description="İlk projenizi oluşturduğunuzda Kanban panolarınızı ve zihin haritalarınızı burada düzenleyebilirsiniz." />}
+          {projects.length === 0 && <EmptyState title={t("Henüz proje yok")} description={t("İlk projenizi oluşturduğunuzda Kanban panolarınızı ve zihin haritalarınızı burada düzenleyebilirsiniz.")} />}
         </div>
       </LibraryScreen>
     );
@@ -1517,9 +1591,9 @@ function ShellContent({
     return (
       <main className="shell-page missing-item-page">
         <EmptyState
-          title={isBoard ? "Kanban panosu bulunamadı" : "Zihin haritası bulunamadı"}
-          description="Bu çalışma silinmiş, arşivlenmiş veya artık erişilemeyen bir bağlantıdan açılmış olabilir."
-          actionLabel={isBoard ? "Kanban panolarına dön" : "Zihin haritalarına dön"}
+          title={t(isBoard ? "Kanban panosu bulunamadı" : "Zihin haritası bulunamadı")}
+          description={t("Bu çalışma silinmiş, arşivlenmiş veya artık erişilemeyen bir bağlantıdan açılmış olabilir.")}
+          actionLabel={t(isBoard ? "Kanban panolarına dön" : "Zihin haritalarına dön")}
           onAction={() => onNavigate({ kind: isBoard ? "boards" : "mindmaps" })}
         />
       </main>
@@ -1535,9 +1609,9 @@ function ShellContent({
       : data.mindMaps.filter((item) => !item.archived && visibleProjectIds.has(item.projectId));
     return (
       <LibraryScreen
-        title={isBoard ? "Kanban Panoları" : "Zihin Haritaları"}
-        description={isBoard ? "Önceliklerinizi akışa dönüştüren çalışma yüzeyleri." : "Düşünceleriniz arasındaki bağları görünür kılın."}
-        actionLabel={isBoard ? "Yeni Kanban panosu" : "Yeni zihin haritası"}
+        title={t(isBoard ? "Kanban Panoları" : "Zihin Haritaları")}
+        description={t(isBoard ? "Önceliklerinizi akışa dönüştüren çalışma yüzeyleri." : "Düşünceleriniz arasındaki bağları görünür kılın.")}
+        actionLabel={t(isBoard ? "Yeni Kanban panosu" : "Yeni zihin haritası")}
         onAction={() => onModal({ type: "item", kind: isBoard ? "board" : "mindmap" })}
       >
         <div className="asset-grid">
@@ -1551,7 +1625,7 @@ function ShellContent({
               onArchive={() => onArchiveItem(item.kind, item.id)}
             />
           ))}
-          {items.length === 0 && <EmptyState title={isBoard ? "Henüz Kanban panosu yok" : "Henüz zihin haritası yok"} description={isBoard ? "Bir proje oluşturup ilk görev akışınızı kurabilirsiniz." : "Bir proje oluşturup düşüncelerinizi dallandırmaya başlayabilirsiniz."} />}
+          {items.length === 0 && <EmptyState title={t(isBoard ? "Henüz Kanban panosu yok" : "Henüz zihin haritası yok")} description={t(isBoard ? "Bir proje oluşturup ilk görev akışınızı kurabilirsiniz." : "Bir proje oluşturup düşüncelerinizi dallandırmaya başlayabilirsiniz.")} />}
         </div>
       </LibraryScreen>
     );
@@ -1566,7 +1640,11 @@ function ShellContent({
         data={data}
         workspaces={workspaces}
         activeWorkspaceId={activeWorkspaceId}
+        language={language}
+        defaultCurrency={defaultCurrency}
         onTheme={onTheme}
+        onLanguage={onLanguage}
+        onDefaultCurrency={onDefaultCurrency}
         onWorkspaceName={onWorkspaceName}
         onProfileName={onProfileName}
         onNewMember={onNewMember}
@@ -1597,6 +1675,7 @@ function HomeScreen({
   onNewProject: () => void;
   onQuickTask: (boardId: string, title: string) => void;
 }) {
+  const { t, language, locale } = useI18n();
   const [quickTitle, setQuickTitle] = useState("");
   const [quickBoardId, setQuickBoardId] = useState("");
   const availableProjects = data.projects.filter((project) => !project.archived);
@@ -1629,8 +1708,12 @@ function HomeScreen({
   const quickBoards = activeBoards;
   const quickBoard = quickBoards.find((board) => board.id === quickBoardId) ?? quickBoards[0];
   const finance = getPortfolioFinance(data.projects);
+  const financeValues = (metric: "activeWorkKurus" | "receivableKurus" | "collectedKurus") =>
+    getPortfolioCurrencies(finance, metric).map((currency) => ({ currency, value: formatMoney(finance[currency][metric], currency, language) }));
   const hour = new Date().getHours();
-  const greeting = hour < 12 ? "Günaydın" : hour < 18 ? "İyi günler" : "İyi akşamlar";
+  const greeting = language === "tr"
+    ? hour < 12 ? "Günaydın" : hour < 18 ? "İyi günler" : "İyi akşamlar"
+    : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
   const profileName = resolveProfileName(data);
   const greetingName = profileName.split(/\s+/).filter(Boolean)[0];
 
@@ -1638,37 +1721,37 @@ function HomeScreen({
     <main className="shell-page home-page">
       <section className="home-hero">
         <div>
-          <span className="eyebrow">{new Intl.DateTimeFormat("tr-TR", { weekday: "long", day: "numeric", month: "long" }).format(new Date())}</span>
+          <span className="eyebrow">{new Intl.DateTimeFormat(locale, { weekday: "long", day: "numeric", month: "long" }).format(new Date())}</span>
           <h1>{greetingName ? `${greeting}, ${greetingName}.` : `${greeting}.`}</h1>
-          <p>Zihniniz açık, görevleriniz görünür. Bugün en anlamlı adıma odaklanın.</p>
+          <p>{language === "tr" ? "Zihniniz açık, görevleriniz görünür. Bugün en anlamlı adıma odaklanın." : "Your mind is clear and your tasks are visible. Focus on today's most meaningful step."}</p>
         </div>
-        <button className="primary-button large" onClick={onNewProject}><Plus size={18} /> Yeni proje</button>
+        <button className="primary-button large" onClick={onNewProject}><Plus size={18} /> {t("Yeni proje")}</button>
       </section>
 
-      <section className="metric-grid" aria-label="Çalışma alanı özeti">
-        <MetricCard icon={FolderKanban} tone="violet" label="Aktif proje" value={workInProgressProjects.length} note={`${activeBoards.length} Kanban panosu`} />
-        <MetricCard icon={ListTodo} tone="blue" label="Üzerinde çalışılan" value={activeTasks.length} note={`${waitingTasks.length} görev beklemede`} />
-        <MetricCard icon={CheckCircle2} tone="green" label="Tamamlanan" value={totalDone} note={`Genel ilerleme %${averageProgress}`} />
-        <MetricCard icon={RotateCcw} tone="amber" label="Ortalama çevrim" value={averageCycle ? `${averageCycle} gün` : "—"} note={`${cycleSamples.length} tamamlanan görevden`} />
+      <section className="metric-grid" aria-label={language === "tr" ? "Çalışma alanı özeti" : "Workspace summary"}>
+        <MetricCard icon={FolderKanban} tone="violet" label={language === "tr" ? "Aktif proje" : "Active projects"} value={workInProgressProjects.length} note={`${activeBoards.length} ${language === "tr" ? "Kanban panosu" : activeBoards.length === 1 ? "Kanban board" : "Kanban boards"}`} />
+        <MetricCard icon={ListTodo} tone="blue" label={language === "tr" ? "Üzerinde çalışılan" : "In progress"} value={activeTasks.length} note={`${waitingTasks.length} ${language === "tr" ? "görev beklemede" : waitingTasks.length === 1 ? "task waiting" : "tasks waiting"}`} />
+        <MetricCard icon={CheckCircle2} tone="green" label={language === "tr" ? "Tamamlanan" : "Completed"} value={totalDone} note={language === "tr" ? `Genel ilerleme %${averageProgress}` : `Overall progress ${averageProgress}%`} />
+        <MetricCard icon={RotateCcw} tone="amber" label={language === "tr" ? "Ortalama çevrim" : "Average cycle"} value={averageCycle ? `${averageCycle} ${language === "tr" ? "gün" : "days"}` : "—"} note={language === "tr" ? `${cycleSamples.length} tamamlanan görevden` : `From ${cycleSamples.length} completed tasks`} />
       </section>
 
-      <section className="finance-overview" aria-label="Finansal görünüm">
+      <section className="finance-overview" aria-label={language === "tr" ? "Finansal görünüm" : "Financial overview"}>
         <header className="section-header compact">
-          <div><span className="eyebrow">PARA AKIŞI</span><h2>Cebinize giren ve girecek tutarlar</h2></div>
-          <button className="text-button" onClick={() => onNavigate({ kind: "insights" })}>Analizi gör <ArrowRight size={15} /></button>
+          <div><span className="eyebrow">{language === "tr" ? "PARA AKIŞI" : "CASH FLOW"}</span><h2>{language === "tr" ? "Cebinize giren ve girecek tutarlar" : "Money collected and expected"}</h2></div>
+          <button className="text-button" onClick={() => onNavigate({ kind: "insights" })}>{language === "tr" ? "Analizi gör" : "View analysis"} <ArrowRight size={15} /></button>
         </header>
         <div className="finance-metric-grid">
-          <FinanceMetricCard tone="violet" label="Aktif proje değeri" value={formatTryKurus(finance.activeWorkKurus)} note="Üzerinde çalışılan projelerin anlaşma toplamı" />
-          <FinanceMetricCard tone="amber" label="Bekleyen alacak" value={formatTryKurus(finance.receivableKurus)} note="Tam tahsil edilen projeler hariç · arşiv dahil" />
-          <FinanceMetricCard tone="green" label="Tahsil edilen" value={formatTryKurus(finance.collectedKurus)} note="Kayıtlı tüm ödemelerin toplamı" />
+          <FinanceMetricCard tone="violet" label={language === "tr" ? "Aktif proje değeri" : "Active project value"} values={financeValues("activeWorkKurus")} note={language === "tr" ? "Üzerinde çalışılan projelerin anlaşma toplamı" : "Total agreed value of projects in progress"} />
+          <FinanceMetricCard tone="amber" label={language === "tr" ? "Bekleyen alacak" : "Outstanding receivable"} values={financeValues("receivableKurus")} note={language === "tr" ? "Tam tahsil edilen projeler hariç · arşiv dahil" : "Excludes fully paid projects · includes archive"} />
+          <FinanceMetricCard tone="green" label={language === "tr" ? "Tahsil edilen" : "Collected"} values={financeValues("collectedKurus")} note={language === "tr" ? "Kayıtlı tüm ödemelerin toplamı" : "Total of all recorded payments"} />
         </div>
       </section>
 
       <section className="dashboard-grid">
         <div className="dashboard-card project-health-card">
           <header className="section-header compact">
-            <div><span className="eyebrow">PORTFÖY SAĞLIĞI</span><h2>Projelerinizin ilerlemesi</h2></div>
-            <button className="text-button" onClick={() => onNavigate({ kind: "projects" })}>Tümünü gör <ArrowRight size={15} /></button>
+            <div><span className="eyebrow">{language === "tr" ? "PORTFÖY SAĞLIĞI" : "PORTFOLIO HEALTH"}</span><h2>{language === "tr" ? "Projelerinizin ilerlemesi" : "Your project progress"}</h2></div>
+            <button className="text-button" onClick={() => onNavigate({ kind: "projects" })}>{language === "tr" ? "Tümünü gör" : "View all"} <ArrowRight size={15} /></button>
           </header>
           <div className="project-health-list">
             {projectStats.map(({ project, stats }) => (
@@ -1677,36 +1760,36 @@ function HomeScreen({
                   <span>{stats.progress}%</span>
                 </div>
                 <div className="health-main">
-                  <div className="health-title"><i style={{ background: project.color }} /><strong>{project.name}</strong><span>{stats.boards} pano</span></div>
-                  <div className="segmented-progress" role="progressbar" aria-label={`${project.name} ilerlemesi`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={stats.progress}>
+                    <div className="health-title"><i style={{ background: project.color }} /><strong>{project.name}</strong><span>{stats.boards} {language === "tr" ? "pano" : stats.boards === 1 ? "board" : "boards"}</span></div>
+                    <div className="segmented-progress" role="progressbar" aria-label={language === "tr" ? `${project.name} ilerlemesi` : `${project.name} progress`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={stats.progress}>
                     <i className="planned" style={{ flex: stats.planned || 0.001 }} />
                     <i className="active" style={{ flex: stats.active || 0.001 }} />
                     <i className="done" style={{ flex: stats.done || 0.001 }} />
                   </div>
                   <div className="health-legend">
-                    <span><i className="planned" /> Öncelikli <strong>{stats.planned}</strong></span>
-                    <span><i className="active" /> Aktif <strong>{stats.active}</strong></span>
-                    <span><i className="done" /> Tamamlanan <strong>{stats.done}</strong></span>
-                    {stats.waiting > 0 && <span className="warning"><CircleAlert size={12} /> {stats.waiting} bekliyor</span>}
+                      <span><i className="planned" /> {language === "tr" ? "Öncelikli" : "Prioritized"} <strong>{stats.planned}</strong></span>
+                      <span><i className="active" /> {language === "tr" ? "Aktif" : "Active"} <strong>{stats.active}</strong></span>
+                      <span><i className="done" /> {language === "tr" ? "Tamamlanan" : "Completed"} <strong>{stats.done}</strong></span>
+                      {stats.waiting > 0 && <span className="warning"><CircleAlert size={12} /> {stats.waiting} {language === "tr" ? "bekliyor" : "waiting"}</span>}
                   </div>
                 </div>
-                <div className="cycle-mini"><span>Ort. süre</span><strong>{stats.averageDays ? `${stats.averageDays} gün` : "—"}</strong></div>
+                  <div className="cycle-mini"><span>{language === "tr" ? "Ort. süre" : "Avg. time"}</span><strong>{stats.averageDays ? `${stats.averageDays} ${language === "tr" ? "gün" : "days"}` : "—"}</strong></div>
                 <ChevronRight size={17} />
               </button>
             ))}
-            {projectStats.length === 0 && <EmptyState title="Henüz aktif proje yok" description="Yeni bir proje oluşturarak çalışma alanınızı başlatın." />}
+            {projectStats.length === 0 && <EmptyState title={language === "tr" ? "Henüz aktif proje yok" : "No active projects yet"} description={language === "tr" ? "Yeni bir proje oluşturarak çalışma alanınızı başlatın." : "Create a new project to get started."} />}
           </div>
         </div>
 
         <aside className="dashboard-card quick-capture-card">
           <div className="capture-icon"><Sparkles size={19} /></div>
-          <span className="eyebrow">HIZLI YAKALA</span>
-          <h2>Aklınızdakini bırakın</h2>
-          <p>Düşünceyi kaybetmeden seçtiğiniz panonun toplam görev listesine ekleyin.</p>
-          <textarea value={quickTitle} onChange={(event) => setQuickTitle(event.target.value)} placeholder="Yeni bir görev veya fikir..." rows={4} aria-label="Hızlı eklenecek görev" />
+          <span className="eyebrow">{language === "tr" ? "HIZLI YAKALA" : "QUICK CAPTURE"}</span>
+          <h2>{language === "tr" ? "Aklınızdakini bırakın" : "Capture what's on your mind"}</h2>
+          <p>{language === "tr" ? "Düşünceyi kaybetmeden seçtiğiniz panonun toplam görev listesine ekleyin." : "Add it to the selected board's total task list before you lose the thought."}</p>
+          <textarea value={quickTitle} onChange={(event) => setQuickTitle(event.target.value)} placeholder={language === "tr" ? "Yeni bir görev veya fikir..." : "A new task or idea..."} rows={4} aria-label={language === "tr" ? "Hızlı eklenecek görev" : "Task to quick capture"} />
           {quickBoards.length > 1 && (
             <label className="quick-board-select">
-              Hedef pano
+              {language === "tr" ? "Hedef pano" : "Target board"}
               <select value={quickBoard?.id ?? ""} onChange={(event) => setQuickBoardId(event.target.value)}>
                 {quickBoards.map((board) => <option key={board.id} value={board.id}>{board.title}</option>)}
               </select>
@@ -1721,15 +1804,15 @@ function HomeScreen({
               setQuickTitle("");
             }}
           >
-            <Plus size={17} /> Toplam görev listesine ekle
+            <Plus size={17} /> {language === "tr" ? "Toplam görev listesine ekle" : "Add to total task list"}
           </button>
-          <small>{quickBoard ? `${quickBoard.title} · atanmamış görev` : "Önce aktif bir projede Kanban panosu oluşturun"}</small>
+          <small>{quickBoard ? `${quickBoard.title} · ${language === "tr" ? "atanmamış görev" : "unassigned task"}` : language === "tr" ? "Önce aktif bir projede Kanban panosu oluşturun" : "Create a Kanban board in an active project first"}</small>
         </aside>
       </section>
 
       <section className="dashboard-grid lower">
         <div className="dashboard-card focus-card">
-          <header className="section-header compact"><div><span className="eyebrow">ŞİMDİ</span><h2>Üzerinde çalıştığınız görevler</h2></div><span className="count-badge">{activeTasks.length}</span></header>
+          <header className="section-header compact"><div><span className="eyebrow">{language === "tr" ? "ŞİMDİ" : "NOW"}</span><h2>{language === "tr" ? "Üzerinde çalıştığınız görevler" : "Tasks you're working on"}</h2></div><span className="count-badge">{activeTasks.length}</span></header>
           <div className="focus-list">
             {activeTasks.slice(0, 5).map(({ task, board }) => {
               const elapsed = getTaskWorkMs(task);
@@ -1739,17 +1822,17 @@ function HomeScreen({
                   <span className="pulse-dot" />
                   <span className="focus-copy"><strong>{task.title}</strong><small>{board.title}</small></span>
                   <span className={`age-badge ${days >= 5 ? "old" : days >= 2 ? "aging" : ""}`}>
-                    {elapsed < 86_400_000 ? "Bugün başladı" : `Aktif süre: ${formatTaskWorkDuration(elapsed)}`}
+                      {elapsed < 86_400_000 ? language === "tr" ? "Bugün başladı" : "Started today" : language === "tr" ? `Aktif süre: ${formatTaskWorkDuration(elapsed, language)}` : `Active time: ${formatTaskWorkDuration(elapsed, language)}`}
                   </span>
                   <ChevronRight size={15} />
                 </button>
               );
             })}
-            {activeTasks.length === 0 && <EmptyState title="Aktif görev yok" description="Bir kartı ‘Üzerinde Çalışılanlar’ sütununa taşıdığınızda burada görünür." />}
+              {activeTasks.length === 0 && <EmptyState title={language === "tr" ? "Aktif görev yok" : "No active tasks"} description={language === "tr" ? "Bir kartı ‘Üzerinde Çalışılanlar’ sütununa taşıdığınızda burada görünür." : "Move a card to an In Progress column and it will appear here."} />}
           </div>
         </div>
         <div className="dashboard-card waiting-card">
-          <header className="section-header compact"><div><span className="eyebrow">DIŞ BAĞIMLILIKLAR</span><h2>Bekleyen ve engellenenler</h2></div><CircleAlert size={19} /></header>
+          <header className="section-header compact"><div><span className="eyebrow">{language === "tr" ? "DIŞ BAĞIMLILIKLAR" : "EXTERNAL DEPENDENCIES"}</span><h2>{language === "tr" ? "Bekleyen ve engellenenler" : "Waiting and blocked"}</h2></div><CircleAlert size={19} /></header>
           <div className="waiting-list">
             {waitingTasks.slice(0, 5).map(({ task, board }) => (
               <button key={task.id} onClick={() => onNavigate({ kind: "board", id: board.id })}>
@@ -1758,7 +1841,7 @@ function HomeScreen({
                 <ChevronRight size={15} />
               </button>
             ))}
-            {waitingTasks.length === 0 && <EmptyState title="Bekleyen görev yok" description="Akışınızı durduran dış bağımlılık görünmüyor." />}
+              {waitingTasks.length === 0 && <EmptyState title={language === "tr" ? "Bekleyen görev yok" : "No waiting tasks"} description={language === "tr" ? "Akışınızı durduran dış bağımlılık görünmüyor." : "No external dependency is blocking your flow."} />}
           </div>
         </div>
       </section>
@@ -1770,11 +1853,11 @@ function MetricCard({ icon: Icon, tone, label, value, note }: { icon: typeof Hom
   return <article className={`metric-card ${tone}`}><div className="metric-icon"><Icon size={20} /></div><div><span>{label}</span><strong>{value}</strong><small>{note}</small></div></article>;
 }
 
-function FinanceMetricCard({ tone, label, value, note }: { tone: string; label: string; value: string; note: string }) {
+function FinanceMetricCard({ tone, label, values, note }: { tone: string; label: string; values: Array<{ currency: CurrencyCode; value: string }>; note: string }) {
   return (
     <article className={`finance-metric ${tone}`}>
       <span className="finance-metric-icon"><BadgeDollarSign size={20} /></span>
-      <div><small>{label}</small><strong>{value}</strong><p>{note}</p></div>
+      <div><small>{label}</small><div className="money-value-list">{values.map((entry) => <strong key={entry.currency}>{entry.value}<em>{entry.currency}</em></strong>)}</div><p>{note}</p></div>
     </article>
   );
 }
@@ -1808,23 +1891,24 @@ function ProjectScreen({
   onDuplicate: (kind: ItemKind, id: string) => void;
   onArchiveItem: (kind: ItemKind, id: string) => void;
 }) {
+  const { t, language, locale } = useI18n();
   const [menuOpen, setMenuOpen] = useState(false);
   const status = getProjectStatus(project);
   const finance = getProjectFinanceTotals(project);
   const statusLabels: Record<ProjectStatus, string> = {
-    active: "Aktif",
-    completed: "Proje tamamlandı",
-    delivered: "Müşteriye teslim edildi",
+    active: language === "tr" ? "Aktif" : "Active",
+    completed: language === "tr" ? "Proje tamamlandı" : "Project completed",
+    delivered: language === "tr" ? "Müşteriye teslim edildi" : "Delivered to client",
   };
   const paymentLabel = finance.paymentState === "paid"
-    ? "Ödeme alındı"
+    ? language === "tr" ? "Ödeme alındı" : "Paid"
     : finance.paymentState === "overpaid"
-      ? "Fazla tahsilat"
+      ? language === "tr" ? "Fazla tahsilat" : "Overpaid"
       : finance.paymentState === "partial"
-        ? "Kısmi tahsilat"
+        ? language === "tr" ? "Kısmi tahsilat" : "Partially paid"
         : finance.paymentState === "unpaid"
-          ? "Tahsilat bekliyor"
-          : "Tutar girilmedi";
+          ? language === "tr" ? "Tahsilat bekliyor" : "Payment pending"
+          : language === "tr" ? "Tutar girilmedi" : "No amount entered";
   const sortedPayments = [...(project.finance?.payments ?? [])].sort((a, b) =>
     b.receivedOn.localeCompare(a.receivedOn),
   );
@@ -1838,21 +1922,21 @@ function ProjectScreen({
           <p>{project.clientName ? `${project.clientName} · ${project.description}` : project.description}</p>
         </div>
         <div className="spacer" />
-        <button className="secondary-button" onClick={onEditProject}><Pencil size={16} /> Düzenle</button>
-        <button className="secondary-button" onClick={() => onNew("mindmap")}><MapIcon size={16} /> Zihin haritası</button>
-        <button className="primary-button" onClick={() => onNew("board")}><Plus size={17} /> Kanban panosu</button>
-        <div className="relative-menu"><button className="icon-button" onClick={() => setMenuOpen((value) => !value)} aria-label="Proje menüsü" aria-haspopup="menu" aria-expanded={menuOpen}><MoreHorizontal size={18} /></button>{menuOpen && <div className="context-menu" role="menu"><button role="menuitem" onClick={onArchiveProject}><Archive size={15} /> Projeyi arşivle</button></div>}</div>
+        <button className="secondary-button" onClick={onEditProject}><Pencil size={16} /> {language === "tr" ? "Düzenle" : "Edit"}</button>
+        <button className="secondary-button" onClick={() => onNew("mindmap")}><MapIcon size={16} /> {language === "tr" ? "Zihin haritası" : "Mind map"}</button>
+        <button className="primary-button" onClick={() => onNew("board")}><Plus size={17} /> {language === "tr" ? "Kanban panosu" : "Kanban board"}</button>
+        <div className="relative-menu"><button className="icon-button" onClick={() => setMenuOpen((value) => !value)} aria-label={language === "tr" ? "Proje menüsü" : "Project menu"} aria-haspopup="menu" aria-expanded={menuOpen}><MoreHorizontal size={18} /></button>{menuOpen && <div className="context-menu" role="menu"><button role="menuitem" onClick={onArchiveProject}><Archive size={15} /> {language === "tr" ? "Projeyi arşivle" : "Archive project"}</button></div>}</div>
       </section>
       <section className="project-summary-strip">
-        <span><LayoutDashboard size={16} /><strong>{boards.length}</strong> Kanban panosu</span>
-        <span><MapIcon size={16} /><strong>{mindMaps.length}</strong> zihin haritası</span>
-        <span><ListTodo size={16} /><strong>{boards.reduce((sum, board) => sum + Object.keys(board.tasks).length, 0)}</strong> toplam görev</span>
+        <span><LayoutDashboard size={16} /><strong>{boards.length}</strong> {language === "tr" ? "Kanban panosu" : "Kanban boards"}</span>
+        <span><MapIcon size={16} /><strong>{mindMaps.length}</strong> {language === "tr" ? "zihin haritası" : "mind maps"}</span>
+        <span><ListTodo size={16} /><strong>{boards.reduce((sum, board) => sum + Object.keys(board.tasks).length, 0)}</strong> {language === "tr" ? "toplam görev" : "total tasks"}</span>
       </section>
 
       <section className="project-overview-grid">
         <article className="project-command-card lifecycle-card">
-          <header><div><span className="eyebrow">PROJE AŞAMASI</span><h2>Proje hangi aşamada?</h2></div><CheckCircle2 size={20} /></header>
-          <div className="lifecycle-steps" role="group" aria-label="Proje aşaması">
+          <header><div><span className="eyebrow">{language === "tr" ? "PROJE AŞAMASI" : "PROJECT STAGE"}</span><h2>{language === "tr" ? "Proje hangi aşamada?" : "What stage is the project in?"}</h2></div><CheckCircle2 size={20} /></header>
+          <div className="lifecycle-steps" role="group" aria-label={language === "tr" ? "Proje aşaması" : "Project stage"}>
             {(["active", "completed", "delivered"] as ProjectStatus[]).map((value, index) => (
               <button
                 key={value}
@@ -1865,58 +1949,58 @@ function ProjectScreen({
             ))}
           </div>
           <p className="command-note">
-            {status === "active" && "Çalışma devam ediyor; aktif proje değeri hesabına dahildir."}
-            {status === "completed" && "Üretim tamamlandı; müşteri teslimi bekleniyor."}
-            {status === "delivered" && "Teslim kaydedildi; kalan alacak tahsil edilene kadar görünür kalır."}
+            {status === "active" && (language === "tr" ? "Çalışma devam ediyor; aktif proje değeri hesabına dahildir." : "Work is in progress and included in active project value.")}
+            {status === "completed" && (language === "tr" ? "Üretim tamamlandı; müşteri teslimi bekleniyor." : "Production is complete; client delivery is pending.")}
+            {status === "delivered" && (language === "tr" ? "Teslim kaydedildi; kalan alacak tahsil edilene kadar görünür kalır." : "Delivery is recorded; the receivable remains visible until collected.")}
           </p>
         </article>
 
         <article className={`project-command-card finance-card ${finance.paymentState}`}>
           <header>
-            <div><span className="eyebrow">FİNANS</span><h2>{project.clientName || "Proje bütçesi"}</h2></div>
+            <div><span className="eyebrow">{language === "tr" ? "FİNANS" : "FINANCE"}</span><h2>{project.clientName || (language === "tr" ? "Proje bütçesi" : "Project budget")}</h2></div>
             <BadgeDollarSign size={20} />
           </header>
           {project.finance ? (
             <>
               <div className="project-money-grid">
-                <div><span>Anlaşılan</span><strong>{formatTryKurus(finance.agreedKurus, true)}</strong></div>
-                <div><span>Tahsil edilen</span><strong>{formatTryKurus(finance.collectedKurus, true)}</strong></div>
-                <div className="receivable"><span>Kalan alacak</span><strong>{formatTryKurus(finance.receivableKurus, true)}</strong></div>
+                <div><span>{language === "tr" ? "Anlaşılan" : "Agreed"}</span><strong>{formatMoney(finance.agreedKurus, finance.currency, language, true)}</strong></div>
+                <div><span>{language === "tr" ? "Tahsil edilen" : "Collected"}</span><strong>{formatMoney(finance.collectedKurus, finance.currency, language, true)}</strong></div>
+                <div className="receivable"><span>{t("Kalan alacak")}</span><strong>{formatMoney(finance.receivableKurus, finance.currency, language, true)}</strong></div>
               </div>
-              <div className="collection-progress" role="progressbar" aria-label="Tahsilat oranı" aria-valuemin={0} aria-valuemax={100} aria-valuenow={finance.collectionRate}>
+              <div className="collection-progress" role="progressbar" aria-label={language === "tr" ? "Tahsilat oranı" : "Collection rate"} aria-valuemin={0} aria-valuemax={100} aria-valuenow={finance.collectionRate}>
                 <i style={{ width: `${finance.collectionRate}%` }} />
               </div>
-              <div className="finance-actions-row"><span className={`payment-badge ${finance.paymentState}`}>{paymentLabel} · %{finance.collectionRate}</span><button className="primary-button" onClick={onAddPayment} disabled={finance.receivableKurus === 0}><Plus size={16} /> Tahsilat ekle</button></div>
+              <div className="finance-actions-row"><span className={`payment-badge ${finance.paymentState}`}>{paymentLabel} · {finance.collectionRate}%</span><button className="primary-button" onClick={onAddPayment} disabled={finance.receivableKurus === 0}><Plus size={16} /> {language === "tr" ? "Tahsilat ekle" : "Add payment"}</button></div>
               {sortedPayments.length > 0 && (
                 <div className="payment-history">
-                  <strong>Tahsilat geçmişi</strong>
+                  <strong>{language === "tr" ? "Tahsilat geçmişi" : "Payment history"}</strong>
                   {sortedPayments.slice(0, 5).map((payment) => (
                     <div key={payment.id}>
-                      <span><strong>{formatTryKurus(payment.amountKurus, true)}</strong><small>{new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "long", year: "numeric" }).format(new Date(`${payment.receivedOn}T12:00:00`))}{payment.note ? ` · ${payment.note}` : ""}</small></span>
-                      <button className="micro-button" onClick={() => onEditPayment(payment.id)} aria-label="Tahsilatı düzenle"><Pencil size={14} /></button>
-                      <button className="micro-button danger" onClick={() => onDeletePayment(payment.id)} aria-label="Tahsilatı sil"><Trash2 size={14} /></button>
+                      <span><strong>{formatMoney(payment.amountKurus, finance.currency, language, true)}</strong><small>{new Intl.DateTimeFormat(locale, { day: "numeric", month: "long", year: "numeric" }).format(new Date(`${payment.receivedOn}T12:00:00`))}{payment.note ? ` · ${payment.note}` : ""}</small></span>
+                      <button className="micro-button" onClick={() => onEditPayment(payment.id)} aria-label={language === "tr" ? "Tahsilatı düzenle" : "Edit payment"}><Pencil size={14} /></button>
+                      <button className="micro-button danger" onClick={() => onDeletePayment(payment.id)} aria-label={language === "tr" ? "Tahsilatı sil" : "Delete payment"}><Trash2 size={14} /></button>
                     </div>
                   ))}
                 </div>
               )}
             </>
           ) : (
-            <div className="finance-empty"><BadgeDollarSign size={24} /><div><strong>Henüz tutar girilmedi</strong><span>Müşteriyle anlaşılan tutarı ekleyerek alacak ve tahsilatı takip edin.</span></div><button className="secondary-button" onClick={onEditProject}>Finans bilgisi ekle</button></div>
+            <div className="finance-empty"><BadgeDollarSign size={24} /><div><strong>{language === "tr" ? "Henüz tutar girilmedi" : "No amount entered yet"}</strong><span>{language === "tr" ? "Müşteriyle anlaşılan tutarı ekleyerek alacak ve tahsilatı takip edin." : "Add the agreed amount to track receivables and payments."}</span></div><button className="secondary-button" onClick={onEditProject}>{language === "tr" ? "Finans bilgisi ekle" : "Add financial details"}</button></div>
           )}
         </article>
       </section>
       <section className="section-block">
-        <header className="section-header"><div><span className="eyebrow">ÇALIŞMA ALANLARI</span><h2>Kanban Panoları</h2></div><button className="text-button" onClick={() => onNew("board")}><Plus size={15} /> Yeni Kanban panosu</button></header>
+        <header className="section-header"><div><span className="eyebrow">{language === "tr" ? "ÇALIŞMA ALANLARI" : "WORKSPACES"}</span><h2>{language === "tr" ? "Kanban Panoları" : "Kanban Boards"}</h2></div><button className="text-button" onClick={() => onNew("board")}><Plus size={15} /> {language === "tr" ? "Yeni Kanban panosu" : "New Kanban board"}</button></header>
         <div className="asset-grid">
           {boards.map((board) => <AssetCard key={board.id} item={board} project={project} onOpen={() => onNavigate({ kind: "board", id: board.id })} onDuplicate={() => onDuplicate("board", board.id)} onArchive={() => onArchiveItem("board", board.id)} />)}
-          {boards.length === 0 && <CreateCard icon={LayoutDashboard} label="İlk Kanban panosunu oluştur" onClick={() => onNew("board")} />}
+          {boards.length === 0 && <CreateCard icon={LayoutDashboard} label={language === "tr" ? "İlk Kanban panosunu oluştur" : "Create your first Kanban board"} onClick={() => onNew("board")} />}
         </div>
       </section>
       <section className="section-block">
-        <header className="section-header"><div><span className="eyebrow">DÜŞÜNCE ALANI</span><h2>Zihin Haritaları</h2></div><button className="text-button" onClick={() => onNew("mindmap")}><Plus size={15} /> Yeni zihin haritası</button></header>
+        <header className="section-header"><div><span className="eyebrow">{language === "tr" ? "DÜŞÜNCE ALANI" : "THINKING SPACE"}</span><h2>{language === "tr" ? "Zihin Haritaları" : "Mind Maps"}</h2></div><button className="text-button" onClick={() => onNew("mindmap")}><Plus size={15} /> {language === "tr" ? "Yeni zihin haritası" : "New mind map"}</button></header>
         <div className="asset-grid">
           {mindMaps.map((map) => <AssetCard key={map.id} item={map} project={project} onOpen={() => onNavigate({ kind: "mindmap", id: map.id })} onDuplicate={() => onDuplicate("mindmap", map.id)} onArchive={() => onArchiveItem("mindmap", map.id)} />)}
-          {mindMaps.length === 0 && <CreateCard icon={MapIcon} label="İlk zihin haritasını oluştur" onClick={() => onNew("mindmap")} />}
+          {mindMaps.length === 0 && <CreateCard icon={MapIcon} label={language === "tr" ? "İlk zihin haritasını oluştur" : "Create your first mind map"} onClick={() => onNew("mindmap")} />}
         </div>
       </section>
     </main>
@@ -1924,17 +2008,18 @@ function ProjectScreen({
 }
 
 function ProjectCard({ project, data, onOpen }: { project: Project; data: AppData; onOpen: () => void }) {
+  const { language } = useI18n();
   const stats = getProjectFlowStats(project, data);
   const status = getProjectStatus(project);
   const finance = getProjectFinanceTotals(project);
-  const statusLabel = status === "active" ? "Aktif" : status === "completed" ? "Tamamlandı" : "Teslim edildi";
+  const statusLabel = status === "active" ? language === "tr" ? "Aktif" : "Active" : status === "completed" ? language === "tr" ? "Tamamlandı" : "Completed" : language === "tr" ? "Teslim edildi" : "Delivered";
   return (
     <button className="project-card" onClick={onOpen} style={{ "--project-color": project.color } as React.CSSProperties}>
       <div className="project-card-top"><span className="project-symbol small"><FolderKanban size={20} /></span><span className={`project-status-badge ${status}`}>{statusLabel}</span><ArrowRight size={17} /></div>
       <h3>{project.name}</h3><p>{project.description}</p>
-      <div className="project-card-progress"><span><strong>{stats.progress}%</strong> ilerleme</span><div role="progressbar" aria-label={`${project.name} ilerlemesi`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={stats.progress}><i style={{ width: `${stats.progress}%` }} /></div></div>
-      {project.finance && <div className="project-card-money"><span>Kalan alacak</span><strong>{formatTryKurus(finance.receivableKurus)}</strong><small>{finance.paymentState === "paid" ? "Ödeme alındı" : `%${finance.collectionRate} tahsil edildi`}</small></div>}
-      <footer><span>{stats.planned} öncelikli</span><span>{stats.active} aktif</span><span>{stats.done} tamamlanan</span></footer>
+      <div className="project-card-progress"><span><strong>{stats.progress}%</strong> {language === "tr" ? "ilerleme" : "progress"}</span><div role="progressbar" aria-label={language === "tr" ? `${project.name} ilerlemesi` : `${project.name} progress`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={stats.progress}><i style={{ width: `${stats.progress}%` }} /></div></div>
+      {project.finance && <div className="project-card-money"><span>{language === "tr" ? "Kalan alacak" : "Outstanding receivable"}</span><strong>{formatMoney(finance.receivableKurus, finance.currency, language)}</strong><small>{finance.paymentState === "paid" ? language === "tr" ? "Ödeme alındı" : "Paid" : language === "tr" ? `%${finance.collectionRate} tahsil edildi` : `${finance.collectionRate}% collected`}</small></div>}
+      <footer><span>{stats.planned} {language === "tr" ? "öncelikli" : "prioritized"}</span><span>{stats.active} {language === "tr" ? "aktif" : "active"}</span><span>{stats.done} {language === "tr" ? "tamamlanan" : "completed"}</span></footer>
     </button>
   );
 }
@@ -1952,6 +2037,7 @@ function AssetCard({
   onDuplicate: () => void;
   onArchive: () => void;
 }) {
+  const { t, language } = useI18n();
   const [menu, setMenu] = useState(false);
   const [referenceTime] = useState(() => Date.now());
   const isBoard = item.kind === "board";
@@ -1965,36 +2051,39 @@ function AssetCard({
           ) : (
             <><i className="map-line one" /><i className="map-line two" /><span className="map-node-preview root" /><span className="map-node-preview a" /><span className="map-node-preview b" /></>
           )}
-          <span className="asset-kind"><>{isBoard ? <LayoutDashboard size={13} /> : <MapIcon size={13} />}</>{isBoard ? "KANBAN PANOSU" : "ZİHİN HARİTASI"}</span>
+          <span className="asset-kind"><>{isBoard ? <LayoutDashboard size={13} /> : <MapIcon size={13} />}</>{language === "tr" ? isBoard ? "KANBAN PANOSU" : "ZİHİN HARİTASI" : isBoard ? "KANBAN BOARD" : "MIND MAP"}</span>
         </div>
-        <div className="asset-copy"><span className="asset-project"><i style={{ background: project?.color }} />{project?.name ?? "Proje"}</span><h3>{item.title}</h3><p>{item.description}</p></div>
-        <footer>{isBoard ? <><span>{stats?.committed} planlanan görev</span><span>%{stats?.progress} tamamlandı</span></> : <><span>{item.nodes.length} fikir</span><span>Zihin haritası</span></>}<span className="updated">{new Intl.RelativeTimeFormat("tr", { numeric: "auto" }).format(Math.max(-30, Math.min(0, Math.round((new Date(item.updatedAt).getTime() - referenceTime) / 86_400_000))), "day")}</span></footer>
+        <div className="asset-copy"><span className="asset-project"><i style={{ background: project?.color }} />{project?.name ?? t("Proje")}</span><h3>{item.title}</h3><p>{item.description}</p></div>
+        <footer>{isBoard ? <><span>{stats?.committed} {language === "tr" ? "planlanan görev" : "planned tasks"}</span><span>{language === "tr" ? `%${stats?.progress} tamamlandı` : `${stats?.progress}% completed`}</span></> : <><span>{item.nodes.length} {language === "tr" ? "fikir" : "ideas"}</span><span>{t("Zihin haritası")}</span></>}<span className="updated">{new Intl.RelativeTimeFormat(language, { numeric: "auto" }).format(Math.max(-30, Math.min(0, Math.round((new Date(item.updatedAt).getTime() - referenceTime) / 86_400_000))), "day")}</span></footer>
       </button>
-      <div className="asset-menu"><button className="icon-button" onClick={() => setMenu((value) => !value)} aria-label="Çalışma menüsü" aria-haspopup="menu" aria-expanded={menu}><MoreHorizontal size={17} /></button>{menu && <div className="context-menu" role="menu"><button role="menuitem" onClick={onDuplicate}><Copy size={15} /> Çoğalt</button><button role="menuitem" onClick={onArchive}><Archive size={15} /> Arşivle</button></div>}</div>
+      <div className="asset-menu"><button className="icon-button" onClick={() => setMenu((value) => !value)} aria-label={language === "tr" ? "Çalışma menüsü" : "Item menu"} aria-haspopup="menu" aria-expanded={menu}><MoreHorizontal size={17} /></button>{menu && <div className="context-menu" role="menu"><button role="menuitem" onClick={onDuplicate}><Copy size={15} /> {t("Çoğalt")}</button><button role="menuitem" onClick={onArchive}><Archive size={15} /> {t("Arşivle")}</button></div>}</div>
     </article>
   );
 }
 
 function CreateCard({ icon: Icon, label, onClick }: { icon: typeof Home; label: string; onClick: () => void }) {
-  return <button className="create-card" onClick={onClick}><span><Icon size={21} /></span><strong>{label}</strong><small>Boş bir çalışma yüzeyiyle başlayın</small></button>;
+  const { t } = useI18n();
+  return <button className="create-card" onClick={onClick}><span><Icon size={21} /></span><strong>{label}</strong><small>{t("Boş bir çalışma yüzeyiyle başlayın")}</small></button>;
 }
 
 function LibraryScreen({ title, description, actionLabel, onAction, children }: { title: string; description: string; actionLabel: string; onAction: () => void; children: React.ReactNode }) {
-  return <main className="shell-page library-page"><header className="page-header"><div><span className="eyebrow">ÇALIŞMA ALANI</span><h1>{title}</h1><p>{description}</p></div><button className="primary-button large" onClick={onAction}><Plus size={18} /> {actionLabel}</button></header>{children}</main>;
+  const { t } = useI18n();
+  return <main className="shell-page library-page"><header className="page-header"><div><span className="eyebrow">{t("ÇALIŞMA ALANI")}</span><h1>{title}</h1><p>{description}</p></div><button className="primary-button large" onClick={onAction}><Plus size={18} /> {actionLabel}</button></header>{children}</main>;
 }
 
 function ArchiveScreen({ data, onRestore, onDelete }: { data: AppData; onRestore: (kind: "project" | ItemKind, id: string) => void; onDelete: (kind: "project" | ItemKind, id: string) => void }) {
+  const { t } = useI18n();
   const projects = data.projects.filter((item) => item.archived).map((item) => ({ kind: "project" as const, id: item.id, title: item.name, description: item.description, icon: FolderKanban }));
   const boards = data.boards.filter((item) => item.archived).map((item) => ({ kind: "board" as const, id: item.id, title: item.title, description: item.description, icon: LayoutDashboard }));
   const maps = data.mindMaps.filter((item) => item.archived).map((item) => ({ kind: "mindmap" as const, id: item.id, title: item.title, description: item.description, icon: MapIcon }));
   const items = [...projects, ...boards, ...maps];
   return (
     <main className="shell-page archive-page">
-      <header className="page-header"><div><span className="eyebrow">GÜVENLİ SAKLAMA</span><h1>Arşiv</h1><p>Tamamlanan veya şimdilik görünmemesi gereken çalışmalar burada korunur.</p></div></header>
-      <div className="archive-notice"><Archive size={19} /><div><strong>Arşiv, silmek değildir.</strong><span>Her şeyi içeriği ve düzeniyle geri getirebilirsiniz.</span></div></div>
+      <header className="page-header"><div><span className="eyebrow">{t("GÜVENLİ SAKLAMA")}</span><h1>{t("Arşiv")}</h1><p>{t("Tamamlanan veya şimdilik görünmemesi gereken çalışmalar burada korunur.")}</p></div></header>
+      <div className="archive-notice"><Archive size={19} /><div><strong>{t("Arşiv, silmek değildir.")}</strong><span>{t("Her şeyi içeriği ve düzeniyle geri getirebilirsiniz.")}</span></div></div>
       <div className="archive-list">
-        {items.map((item) => { const Icon = item.icon; return <article key={`${item.kind}-${item.id}`}><span className="archive-icon"><Icon size={19} /></span><div><strong>{item.title}</strong><p>{item.description}</p><small>{item.kind === "project" ? "Proje" : item.kind === "board" ? "Kanban panosu" : "Zihin haritası"}</small></div><button className="secondary-button" onClick={() => onRestore(item.kind, item.id)}><RotateCcw size={15} /> Geri getir</button><button className="danger-ghost" onClick={() => onDelete(item.kind, item.id)}><Trash2 size={16} /> Kalıcı sil</button></article>; })}
-        {items.length === 0 && <EmptyState title="Arşiv boş" description="Arşivlediğiniz proje ve çalışmalar burada görünecek." />}
+        {items.map((item) => { const Icon = item.icon; return <article key={`${item.kind}-${item.id}`}><span className="archive-icon"><Icon size={19} /></span><div><strong>{item.title}</strong><p>{item.description}</p><small>{t(item.kind === "project" ? "Proje" : item.kind === "board" ? "Kanban panosu" : "Zihin haritası")}</small></div><button className="secondary-button" onClick={() => onRestore(item.kind, item.id)}><RotateCcw size={15} /> {t("Geri getir")}</button><button className="danger-ghost" onClick={() => onDelete(item.kind, item.id)}><Trash2 size={16} /> {t("Kalıcı sil")}</button></article>; })}
+        {items.length === 0 && <EmptyState title={t("Arşiv boş")} description={t("Arşivlediğiniz proje ve çalışmalar burada görünecek.")} />}
       </div>
     </main>
   );
@@ -2004,7 +2093,11 @@ function SettingsScreen({
   data,
   workspaces,
   activeWorkspaceId,
+  language,
+  defaultCurrency,
   onTheme,
+  onLanguage,
+  onDefaultCurrency,
   onWorkspaceName,
   onProfileName,
   onNewMember,
@@ -2022,7 +2115,11 @@ function SettingsScreen({
   data: AppData;
   workspaces: LocalWorkspace[];
   activeWorkspaceId: string;
+  language: Language;
+  defaultCurrency: CurrencyCode;
   onTheme: (theme: ThemeId) => void;
+  onLanguage: (language: Language) => void;
+  onDefaultCurrency: (currency: CurrencyCode) => void;
   onWorkspaceName: (name: string) => void;
   onProfileName: (name: string) => void;
   onNewMember: () => void;
@@ -2037,6 +2134,7 @@ function SettingsScreen({
   onRestoreWorkspace: (id: string) => void;
   onDeleteWorkspace: (id: string) => void;
 }) {
+  const { t } = useI18n();
   const [name, setName] = useState(data.workspaceName);
   const currentProfileName = resolveProfileName(data);
   const [profileNameDraft, setProfileNameDraft] = useState(currentProfileName);
@@ -2052,21 +2150,38 @@ function SettingsScreen({
       const parsed = JSON.parse(await file.text()) as { format?: string; data?: unknown } | unknown;
       const candidate = typeof parsed === "object" && parsed && "data" in parsed ? (parsed as { data: unknown }).data : parsed;
       if (!isWorkspaceData(candidate)) throw new Error("invalid");
-      if (!window.confirm("Mevcut çalışma alanı bu yedekle değiştirilecek. Devam edilsin mi?")) return;
+      if (!window.confirm(language === "tr" ? "Mevcut çalışma alanı bu yedekle değiştirilecek. Devam edilsin mi?" : "The current workspace will be replaced with this backup. Continue?")) return;
       onImport(candidate);
     } catch {
-      window.alert("Bu dosya geçerli bir Akış çalışma alanı yedeği değil.");
+      window.alert(language === "tr" ? "Bu dosya geçerli bir Akış çalışma alanı yedeği değil." : "This file is not a valid Flow workspace backup.");
     } finally {
       if (fileRef.current) fileRef.current.value = "";
     }
   }
   return (
     <main className="shell-page settings-page">
-      <header className="page-header"><div><span className="eyebrow">TERCİHLER</span><h1>Ayarlar</h1><p>Çalışma alanınızı size ait hissettiren ayrıntılar.</p></div></header>
+      <header className="page-header"><div><span className="eyebrow">{t("TERCİHLER")}</span><h1>{t("Ayarlar")}</h1><p>{t("Çalışma alanınızı size ait hissettiren ayrıntılar.")}</p></div></header>
+      <section className="settings-section">
+        <div className="settings-heading"><h2>{t("Dil ve bölge")}</h2><p>{language === "tr" ? "Arayüz dilini ve yeni projelerde önerilecek para birimini seçin." : "Choose the interface language and the currency suggested for new projects."}</p></div>
+        <div className="settings-panel locale-settings">
+          <label className="field-label">{t("Uygulama dili")}
+            <select value={language} onChange={(event) => onLanguage(event.target.value as Language)}>
+              <option value="tr">{languageName("tr", language)}</option>
+              <option value="en">{languageName("en", language)}</option>
+            </select>
+          </label>
+          <label className="field-label">{t("Yeni proje varsayılan para birimi")}
+            <select value={defaultCurrency} onChange={(event) => onDefaultCurrency(event.target.value as CurrencyCode)}>
+              {currencyCodes.map((currency) => <option key={currency} value={currency}>{currencyName(currency, language)} · {currency}</option>)}
+            </select>
+            <small className="field-help">{t("Bu yalnızca yeni projelerde başlangıç seçimini belirler; mevcut projeleri değiştirmez.")}</small>
+          </label>
+        </div>
+      </section>
       <section className="settings-section workspace-settings-section">
-        <div className="settings-heading"><h2>Çalışma alanları</h2><p>Kişisel ve iş içeriklerinizi birbirinden tamamen ayrı tutun.</p></div>
+        <div className="settings-heading"><h2>{t("Çalışma alanları")}</h2><p>{t("Kişisel ve iş içeriklerinizi birbirinden tamamen ayrı tutun.")}</p></div>
         <div className="settings-panel">
-          <div className="members-header"><span>{activeWorkspaceCount} aktif · {workspaces.filter((workspace) => workspace.archived).length} arşivde</span><button className="secondary-button" onClick={onNewWorkspace}><Plus size={16} /> Yeni çalışma alanı</button></div>
+          <div className="members-header"><span>{activeWorkspaceCount} {t("aktif")} · {workspaces.filter((workspace) => workspace.archived).length} {t("arşivde")}</span><button className="secondary-button" onClick={onNewWorkspace}><Plus size={16} /> {t("Yeni çalışma alanı")}</button></div>
           <div className="workspace-management-list">
             {workspaces.map((workspace) => {
               const isActive = workspace.id === activeWorkspaceId;
@@ -2074,12 +2189,12 @@ function SettingsScreen({
               return (
                 <div key={workspace.id} className={`${workspace.archived ? "archived" : ""} ${isActive ? "current" : ""}`}>
                   <i style={{ background: workspace.color }} />
-                  <span><strong>{workspace.name}</strong><small>{workspace.archived ? "Arşivlendi" : isActive ? "Şu anda açık" : `${workspace.data.projects.length} proje · ${taskCount} görev`}</small></span>
+                  <span><strong>{workspace.name}</strong><small>{workspace.archived ? t("Arşivlendi") : isActive ? t("Şu anda açık") : language === "tr" ? `${workspace.data.projects.length} proje · ${taskCount} görev` : `${workspace.data.projects.length} projects · ${taskCount} tasks`}</small></span>
                   <div className="workspace-row-actions">
                     {workspace.archived ? (
-                      <><button className="text-button" onClick={() => onRestoreWorkspace(workspace.id)}><RotateCcw size={14} /> Geri getir</button><button className="danger-ghost" onClick={() => onDeleteWorkspace(workspace.id)}><Trash2 size={14} /> Kalıcı sil</button></>
+                      <><button className="text-button" onClick={() => onRestoreWorkspace(workspace.id)}><RotateCcw size={14} /> {t("Geri getir")}</button><button className="danger-ghost" onClick={() => onDeleteWorkspace(workspace.id)}><Trash2 size={14} /> {t("Kalıcı sil")}</button></>
                     ) : (
-                      <>{!isActive && <button className="text-button" onClick={() => onSwitchWorkspace(workspace.id)}>Aç</button>}<button className="text-button" onClick={() => onEditWorkspace(workspace.id)}><Pencil size={14} /> Adlandır</button><button className="danger-ghost" disabled={activeWorkspaceCount <= 1} onClick={() => onArchiveWorkspace(workspace.id)}><Archive size={14} /> Arşivle</button></>
+                      <>{!isActive && <button className="text-button" onClick={() => onSwitchWorkspace(workspace.id)}>{t("Aç")}</button>}<button className="text-button" onClick={() => onEditWorkspace(workspace.id)}><Pencil size={14} /> {t("Adlandır")}</button><button className="danger-ghost" disabled={activeWorkspaceCount <= 1} onClick={() => onArchiveWorkspace(workspace.id)}><Archive size={14} /> {t("Arşivle")}</button></>
                     )}
                   </div>
                 </div>
@@ -2088,19 +2203,19 @@ function SettingsScreen({
           </div>
         </div>
       </section>
-      <section className="settings-section"><div className="settings-heading"><h2>Çalışma alanı</h2><p>Profiliniz selamlamada ve avatarınızda; çalışma alanı adı ise tüm projelerinizin üzerinde görünür.</p></div><div className="settings-panel identity-settings"><label className="field-label">Profil adı<div className="inline-save"><input value={profileNameDraft} onChange={(event) => setProfileNameDraft(event.target.value)} placeholder="Örn. Hamit Parlak" /><button className="secondary-button" disabled={!profileNameDraft.trim() || profileNameDraft.trim() === currentProfileName} onClick={() => onProfileName(profileNameDraft.trim())}><Check size={15} /> Kaydet</button></div><small className="field-help">Yalnız bu cihazdaki kişisel selamlama için kullanılır.</small></label><label className="field-label">Çalışma alanı adı<div className="inline-save"><input value={name} onChange={(event) => setName(event.target.value)} /><button className="secondary-button" disabled={!name.trim() || name === data.workspaceName} onClick={() => onWorkspaceName(name.trim())}><Check size={15} /> Kaydet</button></div></label></div></section>
-      <section className="settings-section"><div className="settings-heading"><h2>Tema</h2><p>Odak biçiminize uygun görünümü seçin.</p></div><div className="theme-grid">{themes.map((theme) => { const Icon = theme.icon; return <button key={theme.id} className={`theme-card ${theme.id} ${data.theme === theme.id ? "selected" : ""}`} aria-pressed={data.theme === theme.id} onClick={() => onTheme(theme.id)}><div className="theme-preview"><i /><i /><i /></div><span><Icon size={17} /><span><strong>{theme.name}</strong><small>{theme.description}</small></span>{data.theme === theme.id && <Check size={17} />}</span></button>; })}</div></section>
-      <section className="settings-section"><div className="settings-heading"><h2>Kişiler</h2><p>Görev atamak için yerel kişi dizininiz.</p></div><div className="settings-panel"><div className="members-header"><span>{data.members.filter((member) => member.active).length} aktif kişi</span><button className="secondary-button" onClick={onNewMember}><UserPlus size={16} /> Kişi ekle</button></div><div className="settings-members">{data.members.map((member) => <div key={member.id} className={!member.active ? "inactive" : ""}><span className="member-avatar" style={{ background: member.color }}>{member.initials}</span><span><strong>{member.name}</strong><small>{member.active ? "Aktif" : "Pasif · geçmiş atamalar korunur"}</small></span><div className="member-actions"><button className="text-button" onClick={() => onToggleMember(member.id)}>{member.active ? "Pasifleştir" : "Etkinleştir"}</button><button className="danger-ghost" onClick={() => onDeleteMember(member.id)} aria-label={`${member.name} kişisini sil`}><Trash2 size={15} /> Sil</button></div></div>)}</div></div></section>
+      <section className="settings-section"><div className="settings-heading"><h2>{t("Çalışma alanı")}</h2><p>{t("Profiliniz selamlamada ve avatarınızda; çalışma alanı adı ise tüm projelerinizin üzerinde görünür.")}</p></div><div className="settings-panel identity-settings"><label className="field-label">{t("Profil adı")}<div className="inline-save"><input value={profileNameDraft} onChange={(event) => setProfileNameDraft(event.target.value)} placeholder={language === "tr" ? "Örn. Hamit Parlak" : "e.g. Alex Morgan"} /><button className="secondary-button" disabled={!profileNameDraft.trim() || profileNameDraft.trim() === currentProfileName} onClick={() => onProfileName(profileNameDraft.trim())}><Check size={15} /> {t("Kaydet")}</button></div><small className="field-help">{t("Yalnız bu cihazdaki kişisel selamlama için kullanılır.")}</small></label><label className="field-label">{t("Çalışma alanı adı")}<div className="inline-save"><input value={name} onChange={(event) => setName(event.target.value)} /><button className="secondary-button" disabled={!name.trim() || name === data.workspaceName} onClick={() => onWorkspaceName(name.trim())}><Check size={15} /> {t("Kaydet")}</button></div></label></div></section>
+      <section className="settings-section"><div className="settings-heading"><h2>{t("Tema")}</h2><p>{t("Odak biçiminize uygun görünümü seçin.")}</p></div><div className="theme-grid">{themes.map((theme) => { const Icon = theme.icon; return <button key={theme.id} className={`theme-card ${theme.id} ${data.theme === theme.id ? "selected" : ""}`} aria-pressed={data.theme === theme.id} onClick={() => onTheme(theme.id)}><div className="theme-preview"><i /><i /><i /></div><span><Icon size={17} /><span><strong>{t(theme.name)}</strong><small>{t(theme.description)}</small></span>{data.theme === theme.id && <Check size={17} />}</span></button>; })}</div></section>
+      <section className="settings-section"><div className="settings-heading"><h2>{t("Kişiler")}</h2><p>{t("Görev atamak için yerel kişi dizininiz.")}</p></div><div className="settings-panel"><div className="members-header"><span>{data.members.filter((member) => member.active).length} {t("aktif kişi")}</span><button className="secondary-button" onClick={onNewMember}><UserPlus size={16} /> {t("Kişi ekle")}</button></div><div className="settings-members">{data.members.map((member) => <div key={member.id} className={!member.active ? "inactive" : ""}><span className="member-avatar" style={{ background: member.color }}>{member.initials}</span><span><strong>{member.name}</strong><small>{t(member.active ? "Aktif" : "Pasif · geçmiş atamalar korunur")}</small></span><div className="member-actions"><button className="text-button" onClick={() => onToggleMember(member.id)}>{t(member.active ? "Pasifleştir" : "Etkinleştir")}</button><button className="danger-ghost" onClick={() => onDeleteMember(member.id)} aria-label={language === "tr" ? `${member.name} kişisini sil` : `Delete ${member.name}`}><Trash2 size={15} /> {t("Sil")}</button></div></div>)}</div></div></section>
       {desktopInfo ? (
         <section className="settings-section">
-          <div className="settings-heading"><h2>Otomatik kayıt</h2><p>Hiçbir işlem yapmanız gerekmez. Akış bütün değişiklikleri dosyaya ve yedeklere kendisi yazar.</p></div>
+          <div className="settings-heading"><h2>{t("Otomatik kayıt")}</h2><p>{t("Hiçbir işlem yapmanız gerekmez. Akış bütün değişiklikleri dosyaya ve yedeklere kendisi yazar.")}</p></div>
           <div className="backup-panel automatic">
-            <div><HardDrive size={20} /><span><strong>Save klasörüne otomatik kaydediliyor</strong><small className="save-path">{desktopInfo.dataFile}</small></span><span className="status-chip success"><Check size={14} /> Aktif</span></div>
-            <div><ShieldCheck size={20} /><span><strong>Otomatik güvenlik kopyaları</strong><small>Her saat değişiklik varsa yeni bir kopya oluşturulur; son 60 sağlam yedek korunur.</small></span><button className="secondary-button" onClick={() => openDesktopSaveFolder()}><FolderOpen size={16} /> Save klasörünü aç</button></div>
+            <div><HardDrive size={20} /><span><strong>{t("Save klasörüne otomatik kaydediliyor")}</strong><small className="save-path">{desktopInfo.dataFile}</small></span><span className="status-chip success"><Check size={14} /> {t("Aktif")}</span></div>
+            <div><ShieldCheck size={20} /><span><strong>{t("Otomatik güvenlik kopyaları")}</strong><small>{t("Her saat değişiklik varsa yeni bir kopya oluşturulur; son 60 sağlam yedek korunur.")}</small></span><button className="secondary-button" onClick={() => openDesktopSaveFolder()}><FolderOpen size={16} /> {t("Save klasörünü aç")}</button></div>
           </div>
         </section>
       ) : (
-        <section className="settings-section"><div className="settings-heading"><h2>Yedekleme</h2><p>Tarayıcı sürümünde taşınabilir bir dosya alabilirsiniz.</p></div><div className="backup-panel"><div><Download size={20} /><span><strong>Çalışma alanını dışa aktar</strong><small>Tüm proje, görev, kişi ve zihin haritası verilerini taşınabilir JSON dosyasına kaydeder.</small></span><button className="secondary-button" onClick={onExport}><Download size={16} /> Yedek indir</button></div><div><Upload size={20} /><span><strong>Yedekten geri yükle</strong><small>Daha önce alınan bir Akış yedeğini bu cihazda açar.</small></span><input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={(event) => importFile(event.target.files?.[0])} /><button className="secondary-button" onClick={() => fileRef.current?.click()}><Upload size={16} /> Dosya seç</button></div></div></section>
+        <section className="settings-section"><div className="settings-heading"><h2>{t("Yedekleme")}</h2><p>{t("Tarayıcı sürümünde taşınabilir bir dosya alabilirsiniz.")}</p></div><div className="backup-panel"><div><Download size={20} /><span><strong>{t("Çalışma alanını dışa aktar")}</strong><small>{t("Tüm proje, görev, kişi ve zihin haritası verilerini taşınabilir JSON dosyasına kaydeder.")}</small></span><button className="secondary-button" onClick={onExport}><Download size={16} /> {t("Yedek indir")}</button></div><div><Upload size={20} /><span><strong>{t("Yedekten geri yükle")}</strong><small>{t("Daha önce alınan bir Akış yedeğini bu cihazda açar.")}</small></span><input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={(event) => importFile(event.target.files?.[0])} /><button className="secondary-button" onClick={() => fileRef.current?.click()}><Upload size={16} /> {t("Dosya seç")}</button></div></div></section>
       )}
     </main>
   );
@@ -2138,51 +2253,60 @@ function exportWorkspace(data: AppData) {
   URL.revokeObjectURL(url);
 }
 
-function ProjectModal({ project, onClose, onSave }: { project?: Project; onClose: () => void; onSave: (draft: ProjectDraft) => void }) {
+function ProjectModal({ project, defaultCurrency, onClose, onSave }: { project?: Project; defaultCurrency: CurrencyCode; onClose: () => void; onSave: (draft: ProjectDraft) => void }) {
+  const { t, language, locale } = useI18n();
   const [name, setName] = useState(project?.name ?? "");
   const [description, setDescription] = useState(project?.description ?? "");
   const [clientName, setClientName] = useState(project?.clientName ?? "");
+  const [currency, setCurrency] = useState<CurrencyCode>(project?.finance?.currency ?? defaultCurrency);
   const [amount, setAmount] = useState(
     project?.finance
-      ? (project.finance.agreedAmountKurus / 100).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      ? (project.finance.agreedAmountKurus / 100).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
       : "",
   );
   const [color, setColor] = useState(project?.color ?? projectColors[0]);
-  const parsedAmount = amount.trim() ? parseTryToKurus(amount) : undefined;
+  const parsedAmount = amount.trim() ? parseMoneyToMinor(amount) : undefined;
   const collected = project ? getProjectFinanceTotals(project).collectedKurus : 0;
   const amountError = amount.trim() && parsedAmount === null
-    ? "Geçerli bir tutar yazın. Örnek: 12.500,50"
+    ? language === "tr" ? "Geçerli bir tutar yazın. Örnek: 12.500,50" : "Enter a valid amount. Example: 12,500.50"
     : parsedAmount !== undefined && parsedAmount !== null && parsedAmount < collected
-      ? `Anlaşılan tutar, tahsil edilmiş ${formatTryKurus(collected, true)} tutarından düşük olamaz.`
+      ? language === "tr"
+        ? `Anlaşılan tutar, tahsil edilmiş ${formatMoney(collected, currency, language, true)} tutarından düşük olamaz.`
+        : `The agreed amount cannot be lower than the collected ${formatMoney(collected, currency, language, true)}.`
       : !amount.trim() && collected > 0
-        ? "Tahsilat geçmişi olan projede anlaşılan tutar boş bırakılamaz."
+        ? language === "tr" ? "Tahsilat geçmişi olan projede anlaşılan tutar boş bırakılamaz." : "The agreed amount cannot be empty when the project has payments."
         : "";
   const valid = Boolean(name.trim()) && !amountError;
+  const currencyLocked = Boolean(project?.finance?.payments.length);
 
   return (
     <BaseModal
-      title={project ? "Proje bilgilerini düzenle" : "Yeni proje"}
-      subtitle="Hedefi, müşteriyi ve finansal çerçeveyi tek yerde tanımlayın. Finans alanları isteğe bağlıdır."
+      title={t(project ? "Proje bilgilerini düzenle" : "Yeni proje")}
+      subtitle={t("Hedefi, müşteriyi ve finansal çerçeveyi tek yerde tanımlayın. Finans alanları isteğe bağlıdır.")}
       onClose={onClose}
     >
       <div className="field-grid">
-        <label className="field-label">Proje adı<input autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder="Örn. Yeni ürün lansmanı" /></label>
-        <label className="field-label">Müşteri / kurum<input value={clientName} onChange={(event) => setClientName(event.target.value)} placeholder="İsteğe bağlı" /></label>
+        <label className="field-label">{t("Proje adı")}<input autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder={language === "tr" ? "Örn. Yeni ürün lansmanı" : "e.g. New product launch"} /></label>
+        <label className="field-label">{t("Müşteri / kurum")}<input value={clientName} onChange={(event) => setClientName(event.target.value)} placeholder={t("İsteğe bağlı")} /></label>
       </div>
-      <label className="field-label">Kısa açıklama<textarea rows={3} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Bu projede neyi başarmak istiyorsunuz?" /></label>
-      <label className="field-label">Müşteriyle anlaşılan tutar (₺)<input inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="Örn. 125.000,00" />{amountError ? <span className="field-error">{amountError}</span> : <span className="field-help">Kişisel veya ücretsiz projelerde boş bırakabilirsiniz.</span>}</label>
-      <div className="field-label">Proje rengi<div className="color-picker-row">{projectColors.map((value) => <button key={value} className={color === value ? "selected" : ""} style={{ background: value }} onClick={() => setColor(value)} aria-label={`${value} proje rengini seç`} aria-pressed={color === value} />)}</div></div>
-      <div className="modal-actions"><div className="spacer" /><button className="secondary-button" onClick={onClose}>Vazgeç</button><button className="primary-button" disabled={!valid} onClick={() => onSave({ name: name.trim(), description: description.trim() || "Yeni çalışma alanı", color, clientName: clientName.trim() || undefined, agreedAmountKurus: parsedAmount || undefined })}>{project ? "Değişiklikleri kaydet" : "Projeyi oluştur"}</button></div>
+      <label className="field-label">{t("Kısa açıklama")}<textarea rows={3} value={description} onChange={(event) => setDescription(event.target.value)} placeholder={t("Bu projede neyi başarmak istiyorsunuz?")} /></label>
+      <div className="field-grid finance-fields">
+        <label className="field-label">{t("Para birimi")}<select value={currency} disabled={currencyLocked} onChange={(event) => setCurrency(event.target.value as CurrencyCode)}>{currencyCodes.map((code) => <option key={code} value={code}>{currencyName(code, language)} · {code}</option>)}</select>{currencyLocked && <span className="field-help">{t("Tahsilat bulunan projede para birimi değiştirilemez.")}</span>}</label>
+        <label className="field-label">{t("Müşteriyle anlaşılan tutar")} ({currency})<input inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder={language === "tr" ? "Örn. 125.000,00" : "e.g. 125,000.00"} />{amountError ? <span className="field-error">{amountError}</span> : <span className="field-help">{t("Kişisel veya ücretsiz projelerde boş bırakabilirsiniz.")}</span>}</label>
+      </div>
+      <div className="field-label">{t("Proje rengi")}<div className="color-picker-row">{projectColors.map((value) => <button key={value} className={color === value ? "selected" : ""} style={{ background: value }} onClick={() => setColor(value)} aria-label={language === "tr" ? `${value} proje rengini seç` : `Select ${value} project color`} aria-pressed={color === value} />)}</div></div>
+      <div className="modal-actions"><div className="spacer" /><button className="secondary-button" onClick={onClose}>{t("Vazgeç")}</button><button className="primary-button" disabled={!valid} onClick={() => onSave({ name: name.trim(), description: description.trim() || (language === "tr" ? "Yeni çalışma alanı" : "New workspace"), color, clientName: clientName.trim() || undefined, agreedAmountKurus: parsedAmount || undefined, currency })}>{t(project ? "Değişiklikleri kaydet" : "Projeyi oluştur")}</button></div>
     </BaseModal>
   );
 }
 
 function PaymentModal({ project, payment, onClose, onSave }: { project: Project; payment?: ProjectPayment; onClose: () => void; onSave: (draft: PaymentDraft) => void }) {
+  const { t, language, locale } = useI18n();
   const totals = getProjectFinanceTotals(project);
   const editableMaximum = totals.receivableKurus + (payment?.amountKurus ?? 0);
   const suggested = payment?.amountKurus ?? editableMaximum;
   const [amount, setAmount] = useState(
-    (suggested / 100).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+    (suggested / 100).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
   );
   const localToday = (() => {
     const date = new Date();
@@ -2190,51 +2314,57 @@ function PaymentModal({ project, payment, onClose, onSave }: { project: Project;
   })();
   const [receivedOn, setReceivedOn] = useState(payment?.receivedOn ?? localToday);
   const [note, setNote] = useState(payment?.note ?? "");
-  const parsedAmount = parseTryToKurus(amount);
+  const parsedAmount = parseMoneyToMinor(amount);
   const amountError = parsedAmount === null
-    ? "Geçerli ve sıfırdan büyük bir tutar yazın."
+    ? language === "tr" ? "Geçerli ve sıfırdan büyük bir tutar yazın." : "Enter a valid amount greater than zero."
     : parsedAmount > editableMaximum
-      ? `Bu kayıt en fazla kalan ${formatTryKurus(editableMaximum, true)} olabilir.`
+      ? language === "tr" ? `Bu kayıt en fazla kalan ${formatMoney(editableMaximum, totals.currency, language, true)} olabilir.` : `This payment cannot exceed the remaining ${formatMoney(editableMaximum, totals.currency, language, true)}.`
       : "";
 
   return (
-    <BaseModal title={payment ? "Tahsilatı düzenle" : "Tahsilat ekle"} subtitle={`${project.name} · Kalan alacak ${formatTryKurus(totals.receivableKurus, true)}`} onClose={onClose}>
-      <label className="field-label">Tahsil edilen tutar (₺)<input autoFocus inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} />{amountError && <span className="field-error">{amountError}</span>}</label>
-      <label className="field-label">Tahsilat tarihi<input type="date" value={receivedOn} onChange={(event) => setReceivedOn(event.target.value)} /></label>
-      <label className="field-label">Not<textarea rows={3} value={note} onChange={(event) => setNote(event.target.value)} placeholder="Örn. İlk taksit, havale" /></label>
-      <div className="modal-actions"><div className="spacer" /><button className="secondary-button" onClick={onClose}>Vazgeç</button><button className="primary-button" disabled={Boolean(amountError) || !receivedOn || parsedAmount === null} onClick={() => parsedAmount && onSave({ amountKurus: parsedAmount, receivedOn, note: note.trim() || undefined })}>{payment ? "Tahsilatı güncelle" : "Tahsilatı kaydet"}</button></div>
+    <BaseModal title={t(payment ? "Tahsilatı düzenle" : "Tahsilat ekle")} subtitle={`${project.name} · ${t("Kalan alacak")} ${formatMoney(totals.receivableKurus, totals.currency, language, true)}`} onClose={onClose}>
+      <label className="field-label">{t("Tutar")} ({totals.currency})<input autoFocus inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} />{amountError && <span className="field-error">{amountError}</span>}</label>
+      <label className="field-label">{t("Tahsil tarihi")}<input type="date" value={receivedOn} onChange={(event) => setReceivedOn(event.target.value)} /></label>
+      <label className="field-label">{t("Not")}<textarea rows={3} value={note} onChange={(event) => setNote(event.target.value)} placeholder={language === "tr" ? "Örn. İlk taksit, havale" : "e.g. First installment, bank transfer"} /></label>
+      <div className="modal-actions"><div className="spacer" /><button className="secondary-button" onClick={onClose}>{t("Vazgeç")}</button><button className="primary-button" disabled={Boolean(amountError) || !receivedOn || parsedAmount === null} onClick={() => parsedAmount && onSave({ amountKurus: parsedAmount, receivedOn, note: note.trim() || undefined })}>{t(payment ? "Tahsilatı güncelle" : "Tahsilatı kaydet")}</button></div>
     </BaseModal>
   );
 }
 
 function ItemModal({ kind, projects, initialProjectId, onClose, onNewProject, onSave }: { kind: ItemKind; projects: Project[]; initialProjectId?: string; onClose: () => void; onNewProject: () => void; onSave: (kind: ItemKind, projectId: string, title: string) => void }) {
+  const { language } = useI18n();
+  const tr = language === "tr";
   const [projectId, setProjectId] = useState(initialProjectId ?? projects[0]?.id ?? "");
   const [title, setTitle] = useState("");
   const Icon = kind === "board" ? LayoutDashboard : MapIcon;
-  const titleText = kind === "board" ? "Yeni Kanban panosu" : "Yeni zihin haritası";
+  const titleText = kind === "board" ? tr ? "Yeni Kanban panosu" : "New Kanban board" : tr ? "Yeni zihin haritası" : "New mind map";
   if (projects.length === 0) {
     return (
-      <BaseModal title={titleText} subtitle="Her çalışma bir projeye bağlıdır." onClose={onClose}>
-        <EmptyState title="Önce bir proje oluşturun" description={kind === "board" ? "Kanban panonuzu düzenli tutmak için önce bağlı olacağı projeyi oluşturun." : "Zihin haritanızı düzenli tutmak için önce bağlı olacağı projeyi oluşturun."} actionLabel="Yeni proje oluştur" onAction={onNewProject} />
+      <BaseModal title={titleText} subtitle={tr ? "Her çalışma bir projeye bağlıdır." : "Every workspace item belongs to a project."} onClose={onClose}>
+        <EmptyState title={tr ? "Önce bir proje oluşturun" : "Create a project first"} description={kind === "board" ? tr ? "Kanban panonuzu düzenli tutmak için önce bağlı olacağı projeyi oluşturun." : "Create the project that will contain this Kanban board first." : tr ? "Zihin haritanızı düzenli tutmak için önce bağlı olacağı projeyi oluşturun." : "Create the project that will contain this mind map first."} actionLabel={tr ? "Yeni proje oluştur" : "Create project"} onAction={onNewProject} />
       </BaseModal>
     );
   }
-  return <BaseModal title={titleText} subtitle={kind === "board" ? "Varsayılan dört sütunla başlayın, sonra dilediğiniz gibi değiştirin." : "Ana fikri merkeze koyun ve dalları büyütün."} onClose={onClose}><div className="modal-illustration"><Icon size={24} /></div><label className="field-label">Ad<input autoFocus value={title} onChange={(event) => setTitle(event.target.value)} placeholder={kind === "board" ? "Örn. Ürün Yol Haritası" : "Örn. Strateji Haritası"} /></label><label className="field-label">Proje<select value={projectId} onChange={(event) => setProjectId(event.target.value)}>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label><div className="modal-actions"><div className="spacer" /><button className="secondary-button" onClick={onClose}>Vazgeç</button><button className="primary-button" disabled={!title.trim() || !projectId} onClick={() => onSave(kind, projectId, title.trim())}>Oluştur</button></div></BaseModal>;
+  return <BaseModal title={titleText} subtitle={kind === "board" ? tr ? "Varsayılan dört sütunla başlayın, sonra dilediğiniz gibi değiştirin." : "Start with four default columns, then customize them." : tr ? "Ana fikri merkeze koyun ve dalları büyütün." : "Put the main idea at the center and grow its branches."} onClose={onClose}><div className="modal-illustration"><Icon size={24} /></div><label className="field-label">{tr ? "Ad" : "Name"}<input autoFocus value={title} onChange={(event) => setTitle(event.target.value)} placeholder={kind === "board" ? tr ? "Örn. Ürün Yol Haritası" : "e.g. Product Roadmap" : tr ? "Örn. Strateji Haritası" : "e.g. Strategy Map"} /></label><label className="field-label">{tr ? "Proje" : "Project"}<select value={projectId} onChange={(event) => setProjectId(event.target.value)}>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label><div className="modal-actions"><div className="spacer" /><button className="secondary-button" onClick={onClose}>{tr ? "Vazgeç" : "Cancel"}</button><button className="primary-button" disabled={!title.trim() || !projectId} onClick={() => onSave(kind, projectId, title.trim())}>{tr ? "Oluştur" : "Create"}</button></div></BaseModal>;
 }
 
 function DuplicateModal({ kind, projects, currentProjectId, onClose, onNewProject, onSave }: { kind: ItemKind; projects: Project[]; currentProjectId?: string; onClose: () => void; onNewProject: () => void; onSave: (projectId: string, structureOnly: boolean) => void }) {
+  const { language } = useI18n();
+  const tr = language === "tr";
   const [projectId, setProjectId] = useState(currentProjectId ?? projects[0]?.id ?? "");
   const [structureOnly, setStructureOnly] = useState(false);
   if (projects.length === 0) {
-    return <BaseModal title="Bağımsız bir kopya oluştur" subtitle="Kopyanın yerleştirileceği aktif bir proje bulunamadı." onClose={onClose}><EmptyState title="Önce bir proje oluşturun" description="Kopyayı kullanacağınız projeyi oluşturduktan sonra bu işlemi yeniden deneyebilirsiniz." actionLabel="Yeni proje oluştur" onAction={onNewProject} /></BaseModal>;
+    return <BaseModal title={tr ? "Bağımsız bir kopya oluştur" : "Create an independent copy"} subtitle={tr ? "Kopyanın yerleştirileceği aktif bir proje bulunamadı." : "No active project is available for the copy."} onClose={onClose}><EmptyState title={tr ? "Önce bir proje oluşturun" : "Create a project first"} description={tr ? "Kopyayı kullanacağınız projeyi oluşturduktan sonra bu işlemi yeniden deneyebilirsiniz." : "Create the destination project, then try again."} actionLabel={tr ? "Yeni proje oluştur" : "Create project"} onAction={onNewProject} /></BaseModal>;
   }
-  return <BaseModal title="Bağımsız bir kopya oluştur" subtitle="Kaynak çalışma değişmeden yeni bir altlık hazırlayın." onClose={onClose}><label className="field-label">Hedef proje<select value={projectId} onChange={(event) => setProjectId(event.target.value)}>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label><div className="copy-options"><button className={!structureOnly ? "selected" : ""} aria-pressed={!structureOnly} onClick={() => setStructureOnly(false)}><Copy size={18} /><span><strong>Tüm içerikle</strong><small>{kind === "board" ? "Sütunlar, kartlar ve atamalar" : "Tüm fikirler ve bağlantılar"}</small></span>{!structureOnly && <Check size={17} />}</button><button className={structureOnly ? "selected" : ""} aria-pressed={structureOnly} onClick={() => setStructureOnly(true)}><Blocks size={18} /><span><strong>Yalnız yapı</strong><small>{kind === "board" ? "Sütunları boş bir şablon gibi kopyala" : "Yalnız ana fikri kopyala"}</small></span>{structureOnly && <Check size={17} />}</button></div><div className="modal-actions"><div className="spacer" /><button className="secondary-button" onClick={onClose}>Vazgeç</button><button className="primary-button" disabled={!projectId} onClick={() => onSave(projectId, structureOnly)}>Kopyayı oluştur</button></div></BaseModal>;
+  return <BaseModal title={tr ? "Bağımsız bir kopya oluştur" : "Create an independent copy"} subtitle={tr ? "Kaynak çalışma değişmeden yeni bir altlık hazırlayın." : "Create a reusable copy without changing the source."} onClose={onClose}><label className="field-label">{tr ? "Hedef proje" : "Destination project"}<select value={projectId} onChange={(event) => setProjectId(event.target.value)}>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label><div className="copy-options"><button className={!structureOnly ? "selected" : ""} aria-pressed={!structureOnly} onClick={() => setStructureOnly(false)}><Copy size={18} /><span><strong>{tr ? "Tüm içerikle" : "With all content"}</strong><small>{kind === "board" ? tr ? "Sütunlar, kartlar ve atamalar" : "Columns, cards and assignments" : tr ? "Tüm fikirler ve bağlantılar" : "All ideas and connections"}</small></span>{!structureOnly && <Check size={17} />}</button><button className={structureOnly ? "selected" : ""} aria-pressed={structureOnly} onClick={() => setStructureOnly(true)}><Blocks size={18} /><span><strong>{tr ? "Yalnız yapı" : "Structure only"}</strong><small>{kind === "board" ? tr ? "Sütunları boş bir şablon gibi kopyala" : "Copy columns as an empty template" : tr ? "Yalnız ana fikri kopyala" : "Copy only the main idea"}</small></span>{structureOnly && <Check size={17} />}</button></div><div className="modal-actions"><div className="spacer" /><button className="secondary-button" onClick={onClose}>{tr ? "Vazgeç" : "Cancel"}</button><button className="primary-button" disabled={!projectId} onClick={() => onSave(projectId, structureOnly)}>{tr ? "Kopyayı oluştur" : "Create copy"}</button></div></BaseModal>;
 }
 
 function MemberModal({ onClose, onSave }: { onClose: () => void; onSave: (name: string, color: string) => void }) {
+  const { language } = useI18n();
+  const tr = language === "tr";
   const [name, setName] = useState("");
   const [color, setColor] = useState(projectColors[2]);
-  return <BaseModal title="Çalışma alanına kişi ekle" subtitle="Bu kişi yerel görev atamalarında kullanılacak." onClose={onClose}><label className="field-label">Ad soyad<input autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder="Örn. Deniz Yılmaz" /></label><div className="field-label">Avatar rengi<div className="color-picker-row">{projectColors.map((value) => <button key={value} className={color === value ? "selected" : ""} style={{ background: value }} onClick={() => setColor(value)} aria-label={`${value} avatar rengini seç`} aria-pressed={color === value} />)}</div></div><div className="modal-actions"><div className="spacer" /><button className="secondary-button" onClick={onClose}>Vazgeç</button><button className="primary-button" disabled={!name.trim()} onClick={() => onSave(name.trim(), color)}>Kişiyi ekle</button></div></BaseModal>;
+  return <BaseModal title={tr ? "Çalışma alanına kişi ekle" : "Add person to workspace"} subtitle={tr ? "Bu kişi yerel görev atamalarında kullanılacak." : "This person will be available for local task assignments."} onClose={onClose}><label className="field-label">{tr ? "Ad soyad" : "Full name"}<input autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder={tr ? "Örn. Deniz Yılmaz" : "e.g. Alex Morgan"} /></label><div className="field-label">{tr ? "Avatar rengi" : "Avatar color"}<div className="color-picker-row">{projectColors.map((value) => <button key={value} className={color === value ? "selected" : ""} style={{ background: value }} onClick={() => setColor(value)} aria-label={tr ? `${value} avatar rengini seç` : `Select ${value} avatar color`} aria-pressed={color === value} />)}</div></div><div className="modal-actions"><div className="spacer" /><button className="secondary-button" onClick={onClose}>{tr ? "Vazgeç" : "Cancel"}</button><button className="primary-button" disabled={!name.trim()} onClick={() => onSave(name.trim(), color)}>{tr ? "Kişiyi ekle" : "Add person"}</button></div></BaseModal>;
 }
 
 function WorkspaceModal({
@@ -2248,26 +2378,29 @@ function WorkspaceModal({
   onClose: () => void;
   onSave: (name: string, color: string) => void;
 }) {
+  const { language } = useI18n();
+  const tr = language === "tr";
   const [name, setName] = useState(workspace?.name ?? "");
   const [color, setColor] = useState(workspace?.color ?? projectColors[0]);
-  const normalized = name.trim().toLocaleLowerCase("tr-TR");
-  const duplicate = existingNames.some((existing) => existing !== workspace?.name && existing.toLocaleLowerCase("tr-TR") === normalized);
+  const normalized = name.trim().toLocaleLowerCase(tr ? "tr-TR" : "en-US");
+  const duplicate = existingNames.some((existing) => existing !== workspace?.name && existing.toLocaleLowerCase(tr ? "tr-TR" : "en-US") === normalized);
   const valid = Boolean(normalized) && !duplicate;
   return (
     <BaseModal
-      title={workspace ? "Çalışma alanını yeniden adlandır" : "Yeni çalışma alanı"}
-      subtitle={workspace ? "Yeni ad yalnızca bu çalışma alanını etkiler." : "Projeleri, finansı, kişileri ve aramaları tamamen ayrı yeni bir alan oluşturun."}
+      title={workspace ? tr ? "Çalışma alanını yeniden adlandır" : "Rename workspace" : tr ? "Yeni çalışma alanı" : "New workspace"}
+      subtitle={workspace ? tr ? "Yeni ad yalnızca bu çalışma alanını etkiler." : "The new name affects only this workspace." : tr ? "Projeleri, finansı, kişileri ve aramaları tamamen ayrı yeni bir alan oluşturun." : "Create a separate space for projects, finances, people and searches."}
       onClose={onClose}
     >
-      <label className="field-label">Çalışma alanı adı<input autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder="Örn. Şirket Projeleri" />{duplicate && <span className="field-error">Bu adla bir çalışma alanı zaten var.</span>}</label>
-      <div className="field-label">Alan rengi<div className="color-picker-row">{projectColors.map((value) => <button key={value} className={color === value ? "selected" : ""} style={{ background: value }} onClick={() => setColor(value)} aria-label={`${value} çalışma alanı rengini seç`} aria-pressed={color === value} />)}</div></div>
-      <div className="workspace-privacy-note"><ShieldCheck size={18} /><span><strong>Tamamen yerel ve ayrı</strong><small>Bu alanda yalnızca burada oluşturduğunuz proje, finans, kişi ve çalışmalar görünür.</small></span></div>
-      <div className="modal-actions"><div className="spacer" /><button className="secondary-button" onClick={onClose}>Vazgeç</button><button className="primary-button" disabled={!valid} onClick={() => onSave(name.trim(), color)}>{workspace ? "Adı kaydet" : "Çalışma alanını oluştur"}</button></div>
+      <label className="field-label">{tr ? "Çalışma alanı adı" : "Workspace name"}<input autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder={tr ? "Örn. Şirket Projeleri" : "e.g. Company Projects"} />{duplicate && <span className="field-error">{tr ? "Bu adla bir çalışma alanı zaten var." : "A workspace with this name already exists."}</span>}</label>
+      <div className="field-label">{tr ? "Alan rengi" : "Workspace color"}<div className="color-picker-row">{projectColors.map((value) => <button key={value} className={color === value ? "selected" : ""} style={{ background: value }} onClick={() => setColor(value)} aria-label={tr ? `${value} çalışma alanı rengini seç` : `Select ${value} workspace color`} aria-pressed={color === value} />)}</div></div>
+      <div className="workspace-privacy-note"><ShieldCheck size={18} /><span><strong>{tr ? "Tamamen yerel ve ayrı" : "Fully local and separate"}</strong><small>{tr ? "Bu alanda yalnızca burada oluşturduğunuz proje, finans, kişi ve çalışmalar görünür." : "Only the projects, finances, people and work created here are visible in this space."}</small></span></div>
+      <div className="modal-actions"><div className="spacer" /><button className="secondary-button" onClick={onClose}>{tr ? "Vazgeç" : "Cancel"}</button><button className="primary-button" disabled={!valid} onClick={() => onSave(name.trim(), color)}>{workspace ? tr ? "Adı kaydet" : "Save name" : tr ? "Çalışma alanını oluştur" : "Create workspace"}</button></div>
     </BaseModal>
   );
 }
 
 function BaseModal({ title, subtitle, onClose, children }: { title: string; subtitle: string; onClose: () => void; children: React.ReactNode }) {
+  const { language } = useI18n();
   const modalRef = useRef<HTMLElement>(null);
   useEffect(() => {
     const previousFocus = document.activeElement as HTMLElement | null;
@@ -2300,5 +2433,5 @@ function BaseModal({ title, subtitle, onClose, children }: { title: string; subt
       previousFocus?.focus();
     };
   }, [onClose]);
-  return <div className="modal-scrim" onMouseDown={onClose}><section ref={modalRef} className="modal-card" onMouseDown={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label={title}><header><div><h2>{title}</h2><p>{subtitle}</p></div><button className="icon-button" onClick={onClose} aria-label="Pencereyi kapat"><X size={18} /></button></header><div className="modal-content">{children}</div></section></div>;
+  return <div className="modal-scrim" onMouseDown={onClose}><section ref={modalRef} className="modal-card" onMouseDown={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label={title}><header><div><h2>{title}</h2><p>{subtitle}</p></div><button className="icon-button" onClick={onClose} aria-label={language === "tr" ? "Pencereyi kapat" : "Close window"}><X size={18} /></button></header><div className="modal-content">{children}</div></section></div>;
 }

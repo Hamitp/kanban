@@ -1,4 +1,4 @@
-import type { AppData, LocalWorkspace, WorkspaceStore } from "./types";
+import type { AppData, CurrencyCode, Language, LocalWorkspace, WorkspaceStore } from "./types";
 
 export const PERSONAL_WORKSPACE_NAME = "Kişisel Alanım";
 
@@ -9,7 +9,7 @@ export function createWorkspaceStoreFromLegacy(
 ): WorkspaceStore {
   const migratedData = { ...data, workspaceName: PERSONAL_WORKSPACE_NAME };
   return {
-    version: 2,
+    version: 3,
     activeWorkspaceId: workspaceId,
     workspaces: [{
       id: workspaceId,
@@ -20,6 +20,49 @@ export function createWorkspaceStoreFromLegacy(
       updatedAt: stamp,
       data: migratedData,
     }],
+    preferences: { defaultCurrency: "TRY", freshInstallation: false },
+    updatedAt: stamp,
+  };
+}
+
+export function createFreshWorkspaceStore(stamp = new Date().toISOString()): WorkspaceStore {
+  const name = "Akış / Flow";
+  const data: AppData = {
+    version: 1,
+    workspaceName: name,
+    theme: "linen",
+    projects: [],
+    boards: [],
+    mindMaps: [],
+    members: [],
+    labels: [],
+    updatedAt: stamp,
+  };
+  return {
+    version: 3,
+    activeWorkspaceId: "workspace-personal",
+    workspaces: [{
+      id: "workspace-personal",
+      name,
+      color: "#6558c7",
+      archived: false,
+      createdAt: stamp,
+      updatedAt: stamp,
+      data,
+    }],
+    preferences: { defaultCurrency: "TRY", freshInstallation: true },
+    updatedAt: stamp,
+  };
+}
+
+export function setWorkspacePreferences(
+  store: WorkspaceStore,
+  patch: { language?: Language; defaultCurrency?: CurrencyCode; freshInstallation?: boolean },
+  stamp: string,
+): WorkspaceStore {
+  return {
+    ...store,
+    preferences: { ...store.preferences, ...patch },
     updatedAt: stamp,
   };
 }

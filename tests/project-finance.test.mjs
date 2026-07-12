@@ -5,6 +5,7 @@ const {
   getPortfolioFinance,
   getProjectFinanceTotals,
   getProjectStatus,
+  parseMoneyToMinor,
   parseTryToKurus,
   transitionProjectStatus,
 } = await import(new URL("../app/projectFinance.ts", import.meta.url));
@@ -62,11 +63,21 @@ test("portfolio separates active work, outstanding receivable, and collected cas
     },
   };
   const totals = getPortfolioFinance([active, delivered]);
-  assert.deepEqual(totals, {
+  assert.deepEqual(totals.TRY, {
     activeWorkKurus: 2_000_000,
     receivableKurus: 1_500_000,
     collectedKurus: 1_500_000,
   });
+  assert.equal(totals.USD.receivableKurus, 0);
+});
+
+test("portfolio never combines different currencies", () => {
+  const tryProject = { ...baseProject, finance: { currency: "TRY", agreedAmountKurus: 1_000_000, payments: [] } };
+  const usdProject = { ...baseProject, id: "project-usd", finance: { currency: "USD", agreedAmountKurus: 25_000, payments: [] } };
+  const totals = getPortfolioFinance([tryProject, usdProject]);
+  assert.equal(totals.TRY.activeWorkKurus, 1_000_000);
+  assert.equal(totals.USD.activeWorkKurus, 25_000);
+  assert.equal(totals.EUR.activeWorkKurus, 0);
 });
 
 test("status transitions maintain consistent milestone dates", () => {
@@ -84,4 +95,9 @@ test("Turkish currency input parses to integer kurus", () => {
   assert.equal(parseTryToKurus("12500.50"), 1_250_050);
   assert.equal(parseTryToKurus("-100"), null);
   assert.equal(parseTryToKurus("0"), null);
+});
+
+test("localized money input accepts comma and dot decimal conventions", () => {
+  assert.equal(parseMoneyToMinor("12,500.50 USD"), 1_250_050);
+  assert.equal(parseMoneyToMinor("12.500,50 EUR"), 1_250_050);
 });

@@ -19,6 +19,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useI18n } from "../i18n";
 import type { MindMap, MindNode } from "../types";
 import { CanvasZoomControls } from "./CanvasZoomControls";
 import { useCanvasPan } from "./useCanvasPan";
@@ -64,6 +65,8 @@ export function MindMapView({
   onAutoLayout,
   onZoomChange,
 }: MindMapViewProps) {
+  const { language } = useI18n();
+  const tr = language === "tr";
   const [selectedId, setSelectedId] = useState(map.nodes[0]?.id);
   const [outlineOpen, setOutlineOpen] = useState(true);
   const [inspectorOpen, setInspectorOpen] = useState(true);
@@ -203,11 +206,11 @@ export function MindMapView({
     <div className="work-view mindmap-view">
       <header className="work-header map-header">
         <div className="work-heading">
-          <button className="icon-button" onClick={onBack} aria-label="Projeye dön">
+          <button className="icon-button" onClick={onBack} aria-label={tr ? "Projeye dön" : "Back to project"}>
             <ArrowLeft size={18} />
           </button>
           <div>
-            <div className="eyebrow">{projectName} / Zihin haritası</div>
+            <div className="eyebrow">{projectName} / {tr ? "Zihin haritası" : "Mind map"}</div>
             {editingTitle ? (
               <input
                 className="inline-title-input"
@@ -222,7 +225,7 @@ export function MindMapView({
                 }}
               />
             ) : (
-              <button className="title-button" onClick={() => setEditingTitle(true)} aria-label="Zihin haritası adını düzenle">
+              <button className="title-button" onClick={() => setEditingTitle(true)} aria-label={tr ? "Zihin haritası adını düzenle" : "Edit mind map name"}>
                 <h1>{map.title}</h1>
               </button>
             )}
@@ -230,24 +233,24 @@ export function MindMapView({
           </div>
         </div>
         <div className="header-actions">
-          <button className="secondary-button" onClick={onDuplicate}><Copy size={16} /> Çoğalt</button>
-          <button className="secondary-button" onClick={onArchive}><Archive size={16} /> Arşivle</button>
+          <button className="secondary-button" onClick={onDuplicate}><Copy size={16} /> {tr ? "Çoğalt" : "Duplicate"}</button>
+          <button className="secondary-button" onClick={onArchive}><Archive size={16} /> {tr ? "Arşivle" : "Archive"}</button>
           <button className="primary-button" onClick={() => addChild(selected?.id)}>
-            <GitBranch size={16} /> Alt fikir ekle
+            <GitBranch size={16} /> {tr ? "Alt fikir ekle" : "Add child idea"}
           </button>
         </div>
       </header>
 
-      <div className="map-toolbar" role="toolbar" aria-label="Zihin haritası araçları">
+      <div className="map-toolbar" role="toolbar" aria-label={tr ? "Zihin haritası araçları" : "Mind map tools"}>
         <button className="tool-button" onClick={() => addChild(selected?.id)} disabled={!selected}>
-          <Plus size={16} /> Alt fikir
+          <Plus size={16} /> {tr ? "Alt fikir" : "Child idea"}
         </button>
         <button className="tool-button" onClick={() => addChild(selected?.parentId)} disabled={!selected?.parentId}>
-          <GitBranch size={16} /> Kardeş fikir
+          <GitBranch size={16} /> {tr ? "Kardeş fikir" : "Sibling idea"}
         </button>
         <span className="toolbar-divider" />
         <CanvasZoomControls
-          label="Zihin haritası"
+          label={tr ? "Zihin haritası" : "Mind map"}
           zoom={zoom}
           onZoomIn={zoomIn}
           onZoomOut={zoomOut}
@@ -255,22 +258,22 @@ export function MindMapView({
           isMinZoom={isMinZoom}
           isMaxZoom={isMaxZoom}
         />
-        <button className="tool-button" onClick={() => centerMap()}><Focus size={16} /> Merkezle</button>
-        <button className="tool-button" onClick={fitMap}><Maximize2 size={16} /> Tümünü sığdır</button>
-        <button className="tool-button" onClick={onAutoLayout}><LayoutGrid size={16} /> Otomatik düzen</button>
+        <button className="tool-button" onClick={() => centerMap()}><Focus size={16} /> {tr ? "Merkezle" : "Center"}</button>
+        <button className="tool-button" onClick={fitMap}><Maximize2 size={16} /> {tr ? "Tümünü sığdır" : "Fit all"}</button>
+        <button className="tool-button" onClick={onAutoLayout}><LayoutGrid size={16} /> {tr ? "Otomatik düzen" : "Auto layout"}</button>
         <div className="spacer" />
         <button className={`tool-button ${outlineOpen ? "active" : ""}`} aria-pressed={outlineOpen} onClick={() => setOutlineOpen((value) => !value)}>
-          <ListTree size={16} /> Anahat
+          <ListTree size={16} /> {tr ? "Anahat" : "Outline"}
         </button>
         <button className={`tool-button ${inspectorOpen ? "active" : ""}`} aria-pressed={inspectorOpen} onClick={() => setInspectorOpen((value) => !value)}>
-          {inspectorOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />} Ayrıntılar
+          {inspectorOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />} {tr ? "Ayrıntılar" : "Details"}
         </button>
       </div>
 
       <div className="map-workspace">
         {outlineOpen && (
-          <aside className="map-outline" aria-label="Zihin haritası anahat görünümü">
-            <header><ListTree size={17} /><strong>Anahat</strong><span>{map.nodes.length} fikir</span></header>
+          <aside className="map-outline" aria-label={tr ? "Zihin haritası anahat görünümü" : "Mind map outline view"}>
+            <header><ListTree size={17} /><strong>{tr ? "Anahat" : "Outline"}</strong><span>{map.nodes.length} {tr ? "fikir" : "ideas"}</span></header>
             <div className="outline-tree">
               {treeRows.map(({ node, depth }) => (
                 <button
@@ -289,7 +292,7 @@ export function MindMapView({
           </aside>
         )}
 
-        <div className="map-scroll" ref={scrollRef} role="region" aria-label="Zihin haritası tuvali. Boş alanda sürükleyerek gezinebilirsiniz.">
+        <div className="map-scroll" ref={scrollRef} role="region" aria-label={tr ? "Zihin haritası tuvali. Boş alanda sürükleyerek gezinebilirsiniz." : "Mind map canvas. Drag empty space to pan."}>
           <div className="map-canvas-grid" style={{ width: canvasSize.width * zoom, height: canvasSize.height * zoom }}>
             <div className="map-canvas" style={{ width: canvasSize.width, height: canvasSize.height, transform: `scale(${zoom})` }}>
               <svg className="map-edges" width={canvasSize.width} height={canvasSize.height} aria-hidden="true">
@@ -317,7 +320,7 @@ export function MindMapView({
                 <button
                   key={node.id}
                   className={`mind-node ${node.color} ${node.id === selected?.id ? "selected" : ""} ${!node.parentId ? "root" : ""}`}
-                  aria-label={`${node.title}, ${!node.parentId ? "ana konu" : "fikir"}`}
+                  aria-label={`${node.title}, ${!node.parentId ? tr ? "ana konu" : "main topic" : tr ? "fikir" : "idea"}`}
                   aria-pressed={node.id === selected?.id}
                   style={{ left: node.x, top: node.y }}
                   onClick={() => setSelectedId(node.id)}
@@ -337,12 +340,12 @@ export function MindMapView({
                     });
                   }}
                 >
-                  <span className="mind-node-kicker">{!node.parentId ? "ANA KONU" : "FİKİR"}</span>
+                  <span className="mind-node-kicker">{!node.parentId ? tr ? "ANA KONU" : "MAIN TOPIC" : tr ? "FİKİR" : "IDEA"}</span>
                   <strong>{node.title}</strong>
                   {node.note && <small>{node.note}</small>}
                 </button>
               ))}
-              <div className="canvas-hint"><Hand size={15} /> Boş alanda sürükleyerek gezinin · fikir kartlarını tutarak düzenleyin</div>
+              <div className="canvas-hint"><Hand size={15} /> {tr ? "Boş alanda sürükleyerek gezinin · fikir kartlarını tutarak düzenleyin" : "Drag empty space to pan · drag idea cards to arrange"}</div>
             </div>
           </div>
         </div>
@@ -356,8 +359,8 @@ export function MindMapView({
             onDelete={() => {
               const childCount = map.nodes.filter((node) => node.parentId === selected.id).length;
               const message = childCount
-                ? "Bu fikirle birlikte tüm alt dallar da silinecek. Devam edilsin mi?"
-                : "Bu fikir silinsin mi?";
+                ? tr ? "Bu fikirle birlikte tüm alt dallar da silinecek. Devam edilsin mi?" : "This idea and all of its branches will be deleted. Continue?"
+                : tr ? "Bu fikir silinsin mi?" : "Delete this idea?";
               if (!window.confirm(message)) return;
               onDeleteNode(selected.id);
               setSelectedId(selected.parentId ?? root?.id ?? "");
@@ -370,6 +373,8 @@ export function MindMapView({
 }
 
 function NodeInspector({ node, onUpdate, onDelete, onCollapse }: { node: MindNode; onUpdate: (patch: Partial<MindNode>) => void; onDelete: () => void; onCollapse: () => void }) {
+  const { language } = useI18n();
+  const tr = language === "tr";
   const [title, setTitle] = useState(node.title);
   const [note, setNote] = useState(node.note);
   const onUpdateRef = useRef(onUpdate);
@@ -398,10 +403,10 @@ function NodeInspector({ node, onUpdate, onDelete, onCollapse }: { node: MindNod
     onUpdateRef.current({ title: cleanTitle, note: cleanNote });
   }, []);
   return (
-    <aside className="node-inspector" aria-label="Fikir ayrıntıları">
-      <header><div><span className="eyebrow">Seçili fikir</span><h3>Düşünceyi geliştir</h3></div><button className="icon-button" onClick={onCollapse} aria-label="Fikir ayrıntılarını daralt"><PanelRightClose size={17} /></button></header>
+    <aside className="node-inspector" aria-label={tr ? "Fikir ayrıntıları" : "Idea details"}>
+      <header><div><span className="eyebrow">{tr ? "Seçili fikir" : "Selected idea"}</span><h3>{tr ? "Düşünceyi geliştir" : "Develop the idea"}</h3></div><button className="icon-button" onClick={onCollapse} aria-label={tr ? "Fikir ayrıntılarını daralt" : "Collapse idea details"}><PanelRightClose size={17} /></button></header>
       <label className="field-label">
-        Başlık
+        {tr ? "Başlık" : "Title"}
         <input
           value={title}
           onChange={(event) => setTitle(event.target.value)}
@@ -410,33 +415,33 @@ function NodeInspector({ node, onUpdate, onDelete, onCollapse }: { node: MindNod
           }}
           aria-invalid={!title.trim()}
         />
-        {!title.trim() && <span className="field-error">Fikir başlığı boş bırakılamaz.</span>}
+        {!title.trim() && <span className="field-error">{tr ? "Fikir başlığı boş bırakılamaz." : "Idea title cannot be empty."}</span>}
       </label>
       <label className="field-label">
-        Not
+        {tr ? "Not" : "Note"}
         <textarea
           rows={5}
           value={note}
           onChange={(event) => setNote(event.target.value)}
-          placeholder="Bu fikrin bağlamı..."
+          placeholder={tr ? "Bu fikrin bağlamı..." : "Context for this idea..."}
         />
       </label>
       <div className="field-label">
-        <span><Palette size={15} /> Renk</span>
+        <span><Palette size={15} /> {tr ? "Renk" : "Color"}</span>
         <div className="color-picker-row node-colors">
           {nodeColors.map((color) => (
             <button
               key={color}
               className={`${color} ${node.color === color ? "selected" : ""}`}
               onClick={() => onUpdate({ color })}
-              aria-label={`${nodeColorNames[color]} rengini seç`}
+              aria-label={tr ? `${nodeColorNames[color]} rengini seç` : `Select ${color} color`}
               aria-pressed={node.color === color}
             />
           ))}
         </div>
       </div>
-      {node.parentId && <button className="danger-ghost wide" onClick={onDelete}><Trash2 size={16} /> Bu dalı sil</button>}
-      <div className="inspector-tip"><Minus size={14} /><span>İpucu: Fikir kartını sürükleyerek konumlandırın; boş alanı sürükleyerek haritada gezinin.</span></div>
+      {node.parentId && <button className="danger-ghost wide" onClick={onDelete}><Trash2 size={16} /> {tr ? "Bu dalı sil" : "Delete this branch"}</button>}
+      <div className="inspector-tip"><Minus size={14} /><span>{tr ? "İpucu: Fikir kartını sürükleyerek konumlandırın; boş alanı sürükleyerek haritada gezinin." : "Tip: Drag idea cards to position them; drag empty space to pan around the map."}</span></div>
     </aside>
   );
 }

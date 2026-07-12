@@ -1,6 +1,6 @@
-import { getPortfolioFinance } from "./projectFinance.ts";
+import { currencyCodes, getPortfolioFinance } from "./projectFinance.ts";
 import { getTaskWorkMs } from "./taskTiming.ts";
-import type { AppData, KanbanBoard, Project, TaskCard } from "./types";
+import type { AppData, CurrencyCode, KanbanBoard, Language, Project, TaskCard } from "./types";
 
 export interface FlowStats {
   backlog: number;
@@ -128,14 +128,14 @@ function startOfWeek(date: Date) {
   return copy;
 }
 
-export function getWeeklyThroughput(tasks: LocatedTask[], today = new Date(), weeks = 8) {
+export function getWeeklyThroughput(tasks: LocatedTask[], today = new Date(), weeks = 8, language: Language = "tr") {
   const currentWeek = startOfWeek(today);
   const buckets = Array.from({ length: weeks }, (_, index) => {
     const start = new Date(currentWeek);
     start.setDate(start.getDate() - (weeks - index - 1) * 7);
     return {
       key: start.toISOString().slice(0, 10),
-      label: new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "short" }).format(start),
+      label: new Intl.DateTimeFormat(language === "tr" ? "tr-TR" : "en-GB", { day: "numeric", month: "short" }).format(start),
       count: 0,
     };
   });
@@ -149,21 +149,21 @@ export function getWeeklyThroughput(tasks: LocatedTask[], today = new Date(), we
   return buckets;
 }
 
-export function getMonthlyCashflow(data: AppData, today = new Date(), months = 6) {
+export function getMonthlyCashflow(data: AppData, today = new Date(), months = 6, language: Language = "tr") {
   const current = new Date(today.getFullYear(), today.getMonth(), 1);
   const buckets = Array.from({ length: months }, (_, index) => {
     const start = new Date(current.getFullYear(), current.getMonth() - (months - index - 1), 1);
     return {
       key: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}`,
-      label: new Intl.DateTimeFormat("tr-TR", { month: "short" }).format(start),
-      amountKurus: 0,
+      label: new Intl.DateTimeFormat(language === "tr" ? "tr-TR" : "en-GB", { month: "short" }).format(start),
+      amounts: Object.fromEntries(currencyCodes.map((currency) => [currency, 0])) as Record<CurrencyCode, number>,
     };
   });
   const bucketByKey = new Map(buckets.map((bucket) => [bucket.key, bucket]));
   data.projects.forEach((project) => {
     project.finance?.payments.forEach((payment) => {
       const bucket = bucketByKey.get(payment.receivedOn.slice(0, 7));
-      if (bucket) bucket.amountKurus += Math.max(0, payment.amountKurus);
+      if (bucket) bucket.amounts[project.finance!.currency] += Math.max(0, payment.amountKurus);
     });
   });
   return buckets;
@@ -182,7 +182,7 @@ export function getMemberWorkload(data: AppData, tasks: LocatedTask[]) {
     .sort((a, b) => b.count - a.count || a.member.name.localeCompare(b.member.name, "tr"));
 }
 
-export function getWorkspaceInsights(data: AppData, today = new Date()) {
+export function getWorkspaceInsights(data: AppData, today = new Date(), language: Language = "tr") {
   const tasks = getLocatedTasks(data);
   const flow = tasks.reduce(
     (totals, { role }) => {
@@ -209,8 +209,8 @@ export function getWorkspaceInsights(data: AppData, today = new Date()) {
     flow,
     cycle,
     risks,
-    weeklyThroughput: getWeeklyThroughput(tasks, today),
-    monthlyCashflow: getMonthlyCashflow(data, today),
+    weeklyThroughput: getWeeklyThroughput(tasks, today, 8, language),
+    monthlyCashflow: getMonthlyCashflow(data, today, 6, language),
     memberWorkload: getMemberWorkload(data, tasks),
     finance: getPortfolioFinance(data.projects),
   };

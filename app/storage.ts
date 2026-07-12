@@ -11,6 +11,8 @@ const PRIORITIES = new Set(["low", "medium", "high", "critical"]);
 const PROJECT_STATUSES = new Set(["active", "completed", "delivered"]);
 const COLUMN_ROLES = new Set(["backlog", "planned", "active", "done"]);
 const ITEM_KINDS = new Set(["board", "mindmap"]);
+const LANGUAGES = new Set(["tr", "en"]);
+const CURRENCIES = new Set(["TRY", "USD", "EUR", "GBP"]);
 const EPOCH = "1970-01-01T00:00:00.000Z";
 
 type UnknownRecord = Record<string, unknown>;
@@ -119,7 +121,7 @@ function normalizeFinance(value: unknown, fallbackTimestamp: string): UnknownRec
   if (value === undefined) return undefined;
   if (!isRecord(value)) return null;
   if (
-    (value.currency !== undefined && value.currency !== "TRY") ||
+    (value.currency !== undefined && !CURRENCIES.has(value.currency as string)) ||
     !Number.isSafeInteger(value.agreedAmountKurus) ||
     (value.agreedAmountKurus as number) < 0
   ) {
@@ -127,7 +129,7 @@ function normalizeFinance(value: unknown, fallbackTimestamp: string): UnknownRec
   }
   const payments = normalizedRecordArray(value.payments, (payment) => normalizePayment(payment, fallbackTimestamp));
   return payments
-    ? { currency: "TRY", agreedAmountKurus: value.agreedAmountKurus, payments }
+    ? { currency: CURRENCIES.has(value.currency as string) ? value.currency : "TRY", agreedAmountKurus: value.agreedAmountKurus, payments }
     : null;
 }
 
@@ -408,7 +410,7 @@ function normalizeLocalWorkspace(value: unknown): LocalWorkspace | null {
 }
 
 export function normalizeWorkspaceStore(value: unknown): WorkspaceStore | null {
-  if (isRecord(value) && value.version === 2 && Array.isArray(value.workspaces)) {
+  if (isRecord(value) && (value.version === 2 || value.version === 3) && Array.isArray(value.workspaces)) {
     const workspaces = value.workspaces.map(normalizeLocalWorkspace);
     if (workspaces.some((workspace) => !workspace)) return null;
     const normalized = workspaces as LocalWorkspace[];
@@ -417,10 +419,20 @@ export function normalizeWorkspaceStore(value: unknown): WorkspaceStore | null {
     const active = normalized.find((workspace) => workspace.id === activeWorkspaceId && !workspace.archived);
     const fallback = normalized.find((workspace) => !workspace.archived);
     if (!fallback) return null;
+    const rawPreferences = isRecord(value.preferences) ? value.preferences : {};
+    const language = LANGUAGES.has(rawPreferences.language as string) ? rawPreferences.language as "tr" | "en" : undefined;
+    const defaultCurrency = CURRENCIES.has(rawPreferences.defaultCurrency as string)
+      ? rawPreferences.defaultCurrency as "TRY" | "USD" | "EUR" | "GBP"
+      : "TRY";
     return {
-      version: 2,
+      version: 3,
       activeWorkspaceId: active?.id ?? fallback.id,
       workspaces: normalized,
+      preferences: {
+        language,
+        defaultCurrency,
+        freshInstallation: value.version === 3 && rawPreferences.freshInstallation === true,
+      },
       updatedAt: timestampValue(value.updatedAt, fallback.updatedAt),
     };
   }
@@ -428,7 +440,7 @@ export function normalizeWorkspaceStore(value: unknown): WorkspaceStore | null {
   if (!legacy) return null;
   const name = "Kişisel Alanım";
   return {
-    version: 2,
+    version: 3,
     activeWorkspaceId: "workspace-personal",
     workspaces: [{
       id: "workspace-personal",
@@ -439,6 +451,7 @@ export function normalizeWorkspaceStore(value: unknown): WorkspaceStore | null {
       updatedAt: legacy.updatedAt,
       data: { ...legacy, workspaceName: name },
     }],
+    preferences: { defaultCurrency: "TRY", freshInstallation: false },
     updatedAt: legacy.updatedAt,
   };
 }

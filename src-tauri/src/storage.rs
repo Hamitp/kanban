@@ -202,8 +202,25 @@ fn validate_workspace(data: &Value) -> bool {
     let Some(object) = data.as_object() else {
         return false;
     };
-    if object.get("version").and_then(Value::as_u64) != Some(2) {
+    let version = object.get("version").and_then(Value::as_u64);
+    if version != Some(2) && version != Some(3) {
         return false;
+    }
+    if version == Some(3) {
+        let Some(preferences) = object.get("preferences").and_then(Value::as_object) else {
+            return false;
+        };
+        if preferences
+            .get("language")
+            .is_some_and(|language| !matches!(language.as_str(), Some("tr" | "en")))
+            || !matches!(
+                preferences.get("defaultCurrency").and_then(Value::as_str),
+                Some("TRY" | "USD" | "EUR" | "GBP")
+            )
+            || !preferences.get("freshInstallation").is_some_and(Value::is_boolean)
+        {
+            return false;
+        }
     }
     let Some(active_workspace_id) = object.get("activeWorkspaceId").and_then(Value::as_str) else {
         return false;
@@ -855,7 +872,7 @@ mod tests {
 
     fn workspace_store(name: &str) -> Value {
         json!({
-            "version": 2,
+            "version": 3,
             "activeWorkspaceId": "workspace-personal",
             "workspaces": [{
                 "id": "workspace-personal",
@@ -866,6 +883,11 @@ mod tests {
                 "updatedAt": "2026-07-12T12:00:00.000Z",
                 "data": workspace(name)
             }],
+            "preferences": {
+                "language": "en",
+                "defaultCurrency": "USD",
+                "freshInstallation": false
+            },
             "updatedAt": "2026-07-12T12:00:00.000Z"
         })
     }
@@ -929,17 +951,33 @@ mod tests {
     }
 
     #[test]
-    fn accepts_and_round_trips_the_v2_workspace_store() {
+    fn accepts_and_round_trips_the_v3_workspace_store() {
         let root = tempdir().expect("temp dir");
         let paths = StoragePaths::under_documents(root.path());
         let runtime = StorageRuntime::default();
         let expected = workspace_store("Kişisel Alanım");
 
-        write_workspace_at(&paths, &runtime, expected.clone()).expect("v2 save");
-        let loaded = load_workspace_at(&paths, &runtime).expect("v2 load");
+        write_workspace_at(&paths, &runtime, expected.clone()).expect("v3 save");
+        let loaded = load_workspace_at(&paths, &runtime).expect("v3 load");
 
         assert_eq!(loaded.data, Some(expected));
         assert_eq!(loaded.recovery.status, "none");
+    }
+
+    #[test]
+    fn still_accepts_the_v2_workspace_store_for_migration() {
+        let mut legacy = workspace_store("Kişisel Alanım");
+        let object = legacy.as_object_mut().expect("workspace object");
+        object.insert("version".into(), json!(2));
+        object.remove("preferences");
+        assert!(validate_workspace(&legacy));
+    }
+
+    #[test]
+    fn rejects_unknown_v3_currency_preferences() {
+        let mut invalid = workspace_store("Kişisel Alanım");
+        invalid["preferences"]["defaultCurrency"] = json!("JPY");
+        assert!(!validate_workspace(&invalid));
     }
 
     #[test]
