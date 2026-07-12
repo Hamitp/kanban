@@ -1,6 +1,6 @@
 [package]
 name = "akis"
-version = "3.0.0"
+version = "3.0.1"
 description = "Akış çevrimdışı Kanban panosu ve zihin haritası uygulaması"
 authors = ["Hamit Parlak"]
 license = "MIT"
