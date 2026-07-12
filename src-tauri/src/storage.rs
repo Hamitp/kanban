@@ -180,7 +180,7 @@ fn path_text(path: &Path) -> String {
     path.to_string_lossy().into_owned()
 }
 
-fn validate_workspace(data: &Value) -> bool {
+fn validate_app_data(data: &Value) -> bool {
     let Some(object) = data.as_object() else {
         return false;
     };
@@ -191,6 +191,53 @@ fn validate_workspace(data: &Value) -> bool {
         && object.get("mindMaps").is_some_and(Value::is_array)
         && object.get("members").is_some_and(Value::is_array)
         && object.get("labels").is_some_and(Value::is_array)
+}
+
+fn validate_workspace(data: &Value) -> bool {
+    // Read and preserve legacy v1 files so the renderer can migrate them.
+    if validate_app_data(data) {
+        return true;
+    }
+
+    let Some(object) = data.as_object() else {
+        return false;
+    };
+    if object.get("version").and_then(Value::as_u64) != Some(2) {
+        return false;
+    }
+    let Some(active_workspace_id) = object.get("activeWorkspaceId").and_then(Value::as_str) else {
+        return false;
+    };
+    let Some(workspaces) = object.get("workspaces").and_then(Value::as_array) else {
+        return false;
+    };
+    if workspaces.is_empty() {
+        return false;
+    }
+
+    let mut active_workspace_is_available = false;
+    for workspace in workspaces {
+        let Some(workspace) = workspace.as_object() else {
+            return false;
+        };
+        let Some(id) = workspace.get("id").and_then(Value::as_str) else {
+            return false;
+        };
+        if id.is_empty()
+            || workspace.get("name").and_then(Value::as_str).is_none_or(str::is_empty)
+            || !workspace.get("archived").is_some_and(Value::is_boolean)
+            || !workspace.get("data").is_some_and(validate_app_data)
+        {
+            return false;
+        }
+        if id == active_workspace_id
+            && workspace.get("archived").and_then(Value::as_bool) == Some(false)
+        {
+            active_workspace_is_available = true;
+        }
+    }
+
+    active_workspace_is_available
 }
 
 fn checksum(data: &Value) -> String {
@@ -806,6 +853,23 @@ mod tests {
         })
     }
 
+    fn workspace_store(name: &str) -> Value {
+        json!({
+            "version": 2,
+            "activeWorkspaceId": "workspace-personal",
+            "workspaces": [{
+                "id": "workspace-personal",
+                "name": name,
+                "color": "#6558c7",
+                "archived": false,
+                "createdAt": "2026-07-12T12:00:00.000Z",
+                "updatedAt": "2026-07-12T12:00:00.000Z",
+                "data": workspace(name)
+            }],
+            "updatedAt": "2026-07-12T12:00:00.000Z"
+        })
+    }
+
     #[test]
     fn uses_only_the_fixed_documents_save_tree() {
         let paths = StoragePaths::under_documents(Path::new("C:/Users/Test/Documents"));
@@ -862,6 +926,20 @@ mod tests {
             workspace("Bir")
         );
         assert_eq!(list_backups(&paths).expect("backups").len(), 1);
+    }
+
+    #[test]
+    fn accepts_and_round_trips_the_v2_workspace_store() {
+        let root = tempdir().expect("temp dir");
+        let paths = StoragePaths::under_documents(root.path());
+        let runtime = StorageRuntime::default();
+        let expected = workspace_store("Kişisel Alanım");
+
+        write_workspace_at(&paths, &runtime, expected.clone()).expect("v2 save");
+        let loaded = load_workspace_at(&paths, &runtime).expect("v2 load");
+
+        assert_eq!(loaded.data, Some(expected));
+        assert_eq!(loaded.recovery.status, "none");
     }
 
     #[test]
