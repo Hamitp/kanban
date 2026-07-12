@@ -48,17 +48,19 @@ test("Rust persistence keeps the established Save format and recovery chain", as
 });
 
 test("Windows distribution uses a compact current-user NSIS installer", async () => {
-  const [packageText, tauriText] = await Promise.all([
+  const [packageText, tauriText, mainText] = await Promise.all([
     readFile(new URL("package.json", root), "utf8"),
     readFile(new URL("src-tauri/tauri.conf.json", root), "utf8"),
+    readFile(new URL("src-tauri/src/main.rs", root), "utf8"),
   ]);
   const packageJson = JSON.parse(packageText);
   const tauri = JSON.parse(tauriText);
 
-  assert.equal(packageJson.version, "1.0.0");
+  assert.equal(packageJson.version, tauri.version);
   assert.match(packageJson.scripts["desktop:dist"], /tauri build/);
   assert.equal(packageJson.dependencies.electron, undefined);
   assert.deepEqual(tauri.bundle.targets, ["nsis"]);
   assert.equal(tauri.bundle.windows.nsis.installMode, "currentUser");
   assert.equal(tauri.identifier, "com.hamitparlak.akis");
+  assert.match(mainText, /windows_subsystem = "windows"/);
 });
