@@ -23,6 +23,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useI18n } from "../i18n";
 import { newId } from "../seed";
 import { formatTaskWorkDuration, getTaskWorkMs } from "../taskTiming";
 import { getBoardFlowStats } from "../workspaceAnalytics";
@@ -96,6 +97,8 @@ export function BoardView({
   onAddLabel,
   onZoomChange,
 }: BoardViewProps) {
+  const { language } = useI18n();
+  const tr = language === "tr";
   const [clock, setClock] = useState(() => Date.now());
   const [query, setQuery] = useState("");
   const [waitingOnly, setWaitingOnly] = useState(false);
@@ -233,12 +236,12 @@ export function BoardView({
     <div className="work-view board-view">
       <header className="work-header">
         <div className="work-heading">
-          <button className="icon-button" onClick={onBack} aria-label="Projeye dön">
+          <button className="icon-button" onClick={onBack} aria-label={tr ? "Projeye dön" : "Back to project"}>
             <ArrowLeft size={18} />
           </button>
           <div>
-            <div className="eyebrow">{projectName} / Kanban panosu</div>
-            <button className="title-button" onClick={() => setBoardEditor(true)} aria-label="Kanban panosu bilgilerini düzenle">
+            <div className="eyebrow">{projectName} / {tr ? "Kanban panosu" : "Kanban board"}</div>
+            <button className="title-button" onClick={() => setBoardEditor(true)} aria-label={tr ? "Kanban panosu bilgilerini düzenle" : "Edit Kanban board details"}>
               <h1>{board.title}</h1>
               <Pencil size={15} />
             </button>
@@ -247,13 +250,13 @@ export function BoardView({
         </div>
         <div className="header-actions">
           <button className="secondary-button" onClick={onDuplicate}>
-            <Copy size={16} /> Çoğalt
+            <Copy size={16} /> {tr ? "Çoğalt" : "Duplicate"}
           </button>
           <button className="secondary-button" onClick={onArchive}>
-            <Archive size={16} /> Arşivle
+            <Archive size={16} /> {tr ? "Arşivle" : "Archive"}
           </button>
           <button className="primary-button" onClick={() => setColumnEditor("new")}>
-            <Plus size={17} /> Sütun ekle
+            <Plus size={17} /> {tr ? "Sütun ekle" : "Add column"}
           </button>
         </div>
       </header>
@@ -264,8 +267,8 @@ export function BoardView({
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Bu panoda ara..."
-            aria-label="Kanban panosunda görev ara"
+            placeholder={tr ? "Bu panoda ara..." : "Search this board..."}
+            aria-label={tr ? "Kanban panosunda görev ara" : "Search tasks on Kanban board"}
           />
         </label>
         <button
@@ -273,10 +276,10 @@ export function BoardView({
           aria-pressed={waitingOnly}
           onClick={() => setWaitingOnly((value) => !value)}
         >
-          <CircleAlert size={15} /> Bekleyenler
+          <CircleAlert size={15} /> {tr ? "Bekleyenler" : "Waiting"}
         </button>
         <CanvasZoomControls
-          label="Kanban panosu"
+          label={tr ? "Kanban panosu" : "Kanban board"}
           zoom={zoom}
           onZoomIn={zoomIn}
           onZoomOut={zoomOut}
@@ -284,8 +287,8 @@ export function BoardView({
           isMinZoom={isMinZoom}
           isMaxZoom={isMaxZoom}
         />
-        <div className="board-progress" role="progressbar" aria-label="Kanban panosu ilerlemesi" aria-valuemin={0} aria-valuemax={100} aria-valuenow={flow.progress}>
-          <span>%{flow.progress} · {completed}/{total || 0} tamamlandı{flow.backlog ? ` · ${flow.backlog} havuzda` : ""}</span>
+        <div className="board-progress" role="progressbar" aria-label={tr ? "Kanban panosu ilerlemesi" : "Kanban board progress"} aria-valuemin={0} aria-valuemax={100} aria-valuenow={flow.progress}>
+          <span>{flow.progress}% · {completed}/{total || 0} {tr ? "tamamlandı" : "completed"}{flow.backlog ? ` · ${flow.backlog} ${tr ? "havuzda" : "in backlog"}` : ""}</span>
           <div className="progress-track">
             <i style={{ width: `${flow.progress}%` }} />
           </div>
@@ -295,7 +298,7 @@ export function BoardView({
       <main
         className="kanban-scroll"
         ref={scrollRef}
-        aria-label={`${board.title} Kanban panosu`}
+        aria-label={`${board.title} ${tr ? "Kanban panosu" : "Kanban board"}`}
         onDragOver={(event) => {
           if (!draggingTaskId) return;
           updateDragAutoScroll(event.clientX);
@@ -339,14 +342,14 @@ export function BoardView({
                 <header className="column-header">
                   <div>
                     <h2>{column.title}</h2>
-                    <span>{column.taskIds.length} görev</span>
+                    <span>{column.taskIds.length} {tr ? "görev" : column.taskIds.length === 1 ? "task" : "tasks"}</span>
                   </div>
                   <div className="column-actions">
                     <button
                       className="micro-button"
                       disabled={columnIndex === 0}
                       onClick={() => onReorderColumn(column.id, -1)}
-                      aria-label={`${column.title} sütununu sola taşı`}
+                      aria-label={tr ? `${column.title} sütununu sola taşı` : `Move ${column.title} column left`}
                     >
                       <ChevronLeft size={15} />
                     </button>
@@ -354,14 +357,14 @@ export function BoardView({
                       className="micro-button"
                       disabled={columnIndex === board.columns.length - 1}
                       onClick={() => onReorderColumn(column.id, 1)}
-                      aria-label={`${column.title} sütununu sağa taşı`}
+                      aria-label={tr ? `${column.title} sütununu sağa taşı` : `Move ${column.title} column right`}
                     >
                       <ChevronRight size={15} />
                     </button>
                     <button
                       className="micro-button"
                       onClick={() => setColumnEditor(column)}
-                      aria-label={`${column.title} sütununu düzenle`}
+                      aria-label={tr ? `${column.title} sütununu düzenle` : `Edit ${column.title} column`}
                     >
                       <MoreHorizontal size={16} />
                     </button>
@@ -403,21 +406,21 @@ export function BoardView({
                     );
                   })}
                   {taskIds.length === 0 && (query || waitingOnly) && (
-                    <div className="column-empty">Bu filtreye uyan görev yok.</div>
+                    <div className="column-empty">{tr ? "Bu filtreye uyan görev yok." : "No tasks match this filter."}</div>
                   )}
-                  {isColumnDropTarget && <div className="column-drop-placeholder" aria-hidden="true">Sütunun sonuna bırak</div>}
+                  {isColumnDropTarget && <div className="column-drop-placeholder" aria-hidden="true">{tr ? "Sütunun sonuna bırak" : "Drop at end of column"}</div>}
                 </div>
                 <button className="add-task-button" onClick={() => createTask(column.id)}>
-                  <Plus size={16} /> Görev ekle
+                  <Plus size={16} /> {tr ? "Görev ekle" : "Add task"}
                 </button>
               </section>
             );
           })}
           <button className="add-column-card" onClick={() => setColumnEditor("new")}>
-            <Plus size={18} /> Yeni sütun
+            <Plus size={18} /> {tr ? "Yeni sütun" : "New column"}
           </button>
         </div>
-        <div className="canvas-navigation-hint"><Hand size={15} /> Boş alanda sol tuşla, her yerde orta tuşla sürükleyerek gezinin</div>
+        <div className="canvas-navigation-hint"><Hand size={15} /> {tr ? "Boş alanda sol tuşla, her yerde orta tuşla sürükleyerek gezinin" : "Drag empty space with the left button, or anywhere with the middle button, to pan"}</div>
       </main>
 
       {selected && (
@@ -511,6 +514,8 @@ function TaskCardView({
   isDropTarget: boolean;
   clock: number;
 }) {
+  const { language } = useI18n();
+  const tr = language === "tr";
   const taskLabels = task.labelIds
     .map((id) => labels.find((label) => label.id === id))
     .filter(Boolean) as LabelDefinition[];
@@ -542,7 +547,7 @@ function TaskCardView({
         onDragFinish();
       }}
     >
-      {isDropTarget && <div className="task-drop-indicator" aria-hidden="true">Buraya bırak</div>}
+      {isDropTarget && <div className="task-drop-indicator" aria-hidden="true">{tr ? "Buraya bırak" : "Drop here"}</div>}
       <article
         className={`task-card priority-${task.priority} ${task.waitingReason ? "waiting" : ""} ${isDragSource ? "drag-source" : ""}`}
         draggable
@@ -556,11 +561,11 @@ function TaskCardView({
         }}
         onDragEnd={onDragFinish}
       >
-      <button className="task-card-main" onClick={onOpen} aria-label={`${task.title} görevini aç`}>
+      <button className="task-card-main" onClick={onOpen} aria-label={tr ? `${task.title} görevini aç` : `Open task ${task.title}`}>
         <div className="task-drag-row">
           <GripVertical size={14} />
           <span className={`priority-dot ${task.priority}`} />
-          <span>{priorityNames[task.priority]}</span>
+          <span>{tr ? priorityNames[task.priority] : ({ low: "Low", medium: "Medium", high: "High", critical: "Critical" } as Record<Priority, string>)[task.priority]}</span>
         </div>
         <h3>{task.title}</h3>
         {task.waitingReason && (
@@ -589,7 +594,7 @@ function TaskCardView({
           {task.dueDate && (
             <span className="due-date">
               <CalendarDays size={13} />
-              {new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "short" }).format(
+              {new Intl.DateTimeFormat(tr ? "tr-TR" : "en-US", { day: "numeric", month: "short" }).format(
                 new Date(task.dueDate),
               )}
             </span>
@@ -597,10 +602,10 @@ function TaskCardView({
           {hasWorkTime && (
             <span className={`task-age ${task.completedAt ? "complete" : "active"}`}>
               {task.completedAt
-                ? `Tamamlanma süresi: ${formatTaskWorkDuration(workMs)}`
+                ? tr ? `Tamamlanma süresi: ${formatTaskWorkDuration(workMs, language)}` : `Completion time: ${formatTaskWorkDuration(workMs, language)}`
                 : workMs < 86_400_000
-                  ? "Bugün başladı"
-                  : `Aktif süre: ${formatTaskWorkDuration(workMs)}`}
+                  ? tr ? "Bugün başladı" : "Started today"
+                  : tr ? `Aktif süre: ${formatTaskWorkDuration(workMs, language)}` : `Active time: ${formatTaskWorkDuration(workMs, language)}`}
             </span>
           )}
         </footer>
@@ -633,6 +638,8 @@ function TaskPanel({
   onDelete: () => void;
   onAddLabel: (name: string, color: string) => string;
 }) {
+  const { language } = useI18n();
+  const tr = language === "tr";
   const [draft, setDraft] = useState(task);
   const [targetColumnId, setTargetColumnId] = useState(currentColumnId);
   const [newLabel, setNewLabel] = useState("");
@@ -680,37 +687,37 @@ function TaskPanel({
 
   return (
     <div className="panel-scrim" onMouseDown={onClose}>
-      <aside className="task-panel" onMouseDown={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="Görev ayrıntıları">
+      <aside className="task-panel" onMouseDown={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label={tr ? "Görev ayrıntıları" : "Task details"}>
         <header className="panel-header">
           <div>
-            <span className="eyebrow">{isNew ? "Yeni görev" : "Görev ayrıntıları"}</span>
-            <h2>{isNew ? "Bir görevi yakala" : "Görevi düzenle"}</h2>
+            <span className="eyebrow">{isNew ? tr ? "Yeni görev" : "New task" : tr ? "Görev ayrıntıları" : "Task details"}</span>
+            <h2>{isNew ? tr ? "Bir görevi yakala" : "Capture a task" : tr ? "Görevi düzenle" : "Edit task"}</h2>
           </div>
-          <button className="icon-button" onClick={onClose} aria-label="Paneli kapat">
+          <button className="icon-button" onClick={onClose} aria-label={tr ? "Paneli kapat" : "Close panel"}>
             <X size={19} />
           </button>
         </header>
         <div className="panel-body">
           <label className="field-label">
-            Görev başlığı
+            {tr ? "Görev başlığı" : "Task title"}
             <input
               autoFocus
               value={draft.title}
               onChange={(event) => setDraft({ ...draft, title: event.target.value })}
-              placeholder="Ne yapılması gerekiyor?"
+              placeholder={tr ? "Ne yapılması gerekiyor?" : "What needs to be done?"}
             />
           </label>
           <label className="field-label">
-            Açıklama
+            {tr ? "Açıklama" : "Description"}
             <textarea
               value={draft.description}
               onChange={(event) => setDraft({ ...draft, description: event.target.value })}
-              placeholder="Bağlamı ve beklenen sonucu yazın..."
+              placeholder={tr ? "Bağlamı ve beklenen sonucu yazın..." : "Add context and the expected outcome..."}
               rows={4}
             />
           </label>
           <label className="field-label">
-            Sütun
+            {tr ? "Sütun" : "Column"}
             <select value={targetColumnId} onChange={(event) => setTargetColumnId(event.target.value)}>
               {columns.map((column) => (
                 <option key={column.id} value={column.id}>
@@ -720,32 +727,32 @@ function TaskPanel({
             </select>
           </label>
           {!isNew && (
-            <div className="task-move-actions" role="group" aria-label="Görevi hızlı taşı">
-              <span>Hızlı taşı</span>
+            <div className="task-move-actions" role="group" aria-label={tr ? "Görevi hızlı taşı" : "Quickly move task"}>
+              <span>{tr ? "Hızlı taşı" : "Quick move"}</span>
               <div>
-                <button type="button" className="micro-button" disabled={!canMoveUp} onClick={() => saveDraft(currentColumnId, { columnId: currentColumnId, beforeTaskId: currentColumn?.taskIds[currentTaskIndex - 1] })} aria-label="Görevi aynı sütunda yukarı taşı" title="Yukarı taşı"><ArrowUp size={15} /> Yukarı</button>
-                <button type="button" className="micro-button" disabled={!canMoveDown} onClick={() => saveDraft(currentColumnId, { columnId: currentColumnId, beforeTaskId: currentColumn?.taskIds[currentTaskIndex + 2] })} aria-label="Görevi aynı sütunda aşağı taşı" title="Aşağı taşı"><ArrowDown size={15} /> Aşağı</button>
-                <button type="button" className="micro-button" disabled={!canMoveLeft} onClick={() => saveDraft(currentColumnId, { columnId: columns[currentColumnIndex - 1].id })} aria-label="Görevi önceki sütuna taşı" title="Önceki sütuna taşı"><ChevronLeft size={15} /> Önceki sütun</button>
-                <button type="button" className="micro-button" disabled={!canMoveRight} onClick={() => saveDraft(currentColumnId, { columnId: columns[currentColumnIndex + 1].id })} aria-label="Görevi sonraki sütuna taşı" title="Sonraki sütuna taşı"><ChevronRight size={15} /> Sonraki sütun</button>
+                <button type="button" className="micro-button" disabled={!canMoveUp} onClick={() => saveDraft(currentColumnId, { columnId: currentColumnId, beforeTaskId: currentColumn?.taskIds[currentTaskIndex - 1] })}><ArrowUp size={15} /> {tr ? "Yukarı" : "Up"}</button>
+                <button type="button" className="micro-button" disabled={!canMoveDown} onClick={() => saveDraft(currentColumnId, { columnId: currentColumnId, beforeTaskId: currentColumn?.taskIds[currentTaskIndex + 2] })}><ArrowDown size={15} /> {tr ? "Aşağı" : "Down"}</button>
+                <button type="button" className="micro-button" disabled={!canMoveLeft} onClick={() => saveDraft(currentColumnId, { columnId: columns[currentColumnIndex - 1].id })}><ChevronLeft size={15} /> {tr ? "Önceki sütun" : "Previous column"}</button>
+                <button type="button" className="micro-button" disabled={!canMoveRight} onClick={() => saveDraft(currentColumnId, { columnId: columns[currentColumnIndex + 1].id })}><ChevronRight size={15} /> {tr ? "Sonraki sütun" : "Next column"}</button>
               </div>
             </div>
           )}
           <div className="field-grid">
             <label className="field-label">
-              Öncelik
+              {tr ? "Öncelik" : "Priority"}
               <select
                 value={draft.priority}
                 onChange={(event) => setDraft({ ...draft, priority: event.target.value as Priority })}
               >
                 {Object.entries(priorityNames).map(([value, name]) => (
                   <option key={value} value={value}>
-                    {name}
+                    {tr ? name : ({ low: "Low", medium: "Medium", high: "High", critical: "Critical" } as Record<string, string>)[value]}
                   </option>
                 ))}
               </select>
             </label>
             <label className="field-label">
-              Son tarih
+              {tr ? "Son tarih" : "Due date"}
               <input
                 type="date"
                 value={draft.dueDate ?? ""}
@@ -754,7 +761,7 @@ function TaskPanel({
             </label>
           </div>
           <label className="field-label">
-            Bekleme / engel nedeni
+            {tr ? "Bekleme / engel nedeni" : "Waiting / blocker reason"}
             <div className="input-with-icon">
               <CircleAlert size={16} />
               <input
@@ -762,13 +769,13 @@ function TaskPanel({
                 onChange={(event) =>
                   setDraft({ ...draft, waitingReason: event.target.value || undefined })
                 }
-                placeholder="Örn. müşteriden kritik bilgi bekleniyor"
+                placeholder={tr ? "Örn. müşteriden kritik bilgi bekleniyor" : "e.g. waiting for critical information from client"}
               />
             </div>
           </label>
           <fieldset className="choice-fieldset">
             <legend>
-              <Tag size={15} /> Etiketler
+              <Tag size={15} /> {tr ? "Etiketler" : "Labels"}
             </legend>
             <div className="choice-grid">
               {labels.map((label) => (
@@ -781,13 +788,13 @@ function TaskPanel({
                   <i style={{ background: label.color }} /> {label.name}
                 </label>
               ))}
-              {pendingLabels.map((label) => <span className="choice-pill pending" key={label}><i style={{ background: "#7771c9" }} />{label} · yeni</span>)}
+              {pendingLabels.map((label) => <span className="choice-pill pending" key={label}><i style={{ background: "#7771c9" }} />{label} · {tr ? "yeni" : "new"}</span>)}
             </div>
             <div className="inline-create">
               <input
                 value={newLabel}
                 onChange={(event) => setNewLabel(event.target.value)}
-                placeholder="Yeni etiket..."
+                placeholder={tr ? "Yeni etiket..." : "New label..."}
               />
               <button
                 type="button"
@@ -795,19 +802,19 @@ function TaskPanel({
                 disabled={!newLabel.trim()}
                 onClick={() => {
                   const label = newLabel.trim();
-                  if (!pendingLabels.some((item) => item.toLocaleLowerCase("tr") === label.toLocaleLowerCase("tr"))) {
+                  if (!pendingLabels.some((item) => item.toLocaleLowerCase(language) === label.toLocaleLowerCase(language))) {
                     setPendingLabels((current) => [...current, label]);
                   }
                   setNewLabel("");
                 }}
               >
-                <Plus size={15} /> Ekle
+                <Plus size={15} /> {tr ? "Ekle" : "Add"}
               </button>
             </div>
           </fieldset>
           <fieldset className="choice-fieldset">
             <legend>
-              <UserPlus size={15} /> Atanan kişiler
+              <UserPlus size={15} /> {tr ? "Atanan kişiler" : "Assignees"}
             </legend>
             <div className="member-choice-list">
               {members.filter((member) => member.active).map((member) => (
@@ -828,18 +835,18 @@ function TaskPanel({
         </div>
         <footer className="panel-footer">
           {!isNew && (
-            <button className="danger-ghost" onClick={() => window.confirm("Bu görev silinsin mi?") && onDelete()}>
-              <Trash2 size={16} /> Sil
+            <button className="danger-ghost" onClick={() => window.confirm(tr ? "Bu görev silinsin mi?" : "Delete this task?") && onDelete()}>
+              <Trash2 size={16} /> {tr ? "Sil" : "Delete"}
             </button>
           )}
           <div className="spacer" />
-          <button className="secondary-button" onClick={onClose}>Vazgeç</button>
+          <button className="secondary-button" onClick={onClose}>{tr ? "Vazgeç" : "Cancel"}</button>
           <button
             className="primary-button"
             disabled={!hasValidTitle}
             onClick={() => saveDraft()}
           >
-            Kaydet
+            {tr ? "Kaydet" : "Save"}
           </button>
         </footer>
       </aside>
@@ -858,17 +865,19 @@ function ColumnEditor({
   onSave: (title: string, color: string, role?: BoardColumn["role"]) => void;
   onDelete?: () => void;
 }) {
+  const { language } = useI18n();
+  const tr = language === "tr";
   const [title, setTitle] = useState(column?.title ?? "");
   const [color, setColor] = useState(column?.color ?? columnColors[0]);
   const [role, setRole] = useState<BoardColumn["role"] | "">(column?.role ?? "");
   return (
-    <Modal title={column ? "Sütunu düzenle" : "Yeni sütun"} onClose={onClose}>
+    <Modal title={column ? tr ? "Sütunu düzenle" : "Edit column" : tr ? "Yeni sütun" : "New column"} onClose={onClose}>
       <label className="field-label">
-        Sütun adı
-        <input autoFocus value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Örn. İncelemede" />
+        {tr ? "Sütun adı" : "Column name"}
+        <input autoFocus value={title} onChange={(event) => setTitle(event.target.value)} placeholder={tr ? "Örn. İncelemede" : "e.g. In review"} />
       </label>
       <div className="field-label">
-        Renk
+        {tr ? "Renk" : "Color"}
         <div className="color-picker-row">
           {columnColors.map((value) => (
             <button
@@ -876,33 +885,33 @@ function ColumnEditor({
               className={color === value ? "selected" : ""}
               style={{ background: value }}
               onClick={() => setColor(value)}
-              aria-label={`${value} rengini seç`}
+              aria-label={tr ? `${value} rengini seç` : `Select ${value} color`}
               aria-pressed={color === value}
             />
           ))}
         </div>
       </div>
       <label className="field-label">
-        Akış anlamı
+        {tr ? "Akış anlamı" : "Workflow meaning"}
         <select value={role} onChange={(event) => setRole(event.target.value as BoardColumn["role"] | "")}>
-          <option value="">Özel sütun</option>
-          <option value="backlog">Önceliklendirilmemiş havuz</option>
-          <option value="planned">Önceliklendirilmiş görev</option>
-          <option value="active">Üzerinde çalışılan</option>
-          <option value="done">Tamamlanan</option>
+          <option value="">{tr ? "Özel sütun" : "Custom column"}</option>
+          <option value="backlog">{tr ? "Önceliklendirilmemiş havuz" : "Unprioritized backlog"}</option>
+          <option value="planned">{tr ? "Önceliklendirilmiş görev" : "Prioritized task"}</option>
+          <option value="active">{tr ? "Üzerinde çalışılan" : "In progress"}</option>
+          <option value="done">{tr ? "Tamamlanan" : "Completed"}</option>
         </select>
-        <small className="field-help">İlerleme grafikleri ve süre sayacı bu anlamı kullanır.</small>
+        <small className="field-help">{tr ? "İlerleme grafikleri ve süre sayacı bu anlamı kullanır." : "Progress charts and the duration timer use this meaning."}</small>
       </label>
       <div className="modal-actions">
         {onDelete && (
           <button className="danger-ghost" onClick={onDelete}>
-            <Trash2 size={16} /> Sütunu sil
+            <Trash2 size={16} /> {tr ? "Sütunu sil" : "Delete column"}
           </button>
         )}
         <div className="spacer" />
-        <button className="secondary-button" onClick={onClose}>Vazgeç</button>
+        <button className="secondary-button" onClick={onClose}>{tr ? "Vazgeç" : "Cancel"}</button>
         <button className="primary-button" disabled={!title.trim()} onClick={() => onSave(title.trim(), color, role || undefined)}>
-          Kaydet
+          {tr ? "Kaydet" : "Save"}
         </button>
       </div>
     </Modal>
@@ -920,23 +929,25 @@ function BoardEditor({
   onClose: () => void;
   onSave: (title: string, description: string) => void;
 }) {
+  const { language } = useI18n();
+  const tr = language === "tr";
   const [title, setTitle] = useState(initialTitle);
   const [description, setDescription] = useState(initialDescription);
   return (
-    <Modal title="Kanban panosu bilgileri" onClose={onClose}>
+    <Modal title={tr ? "Kanban panosu bilgileri" : "Kanban board details"} onClose={onClose}>
       <label className="field-label">
-        Kanban panosu adı
+        {tr ? "Kanban panosu adı" : "Kanban board name"}
         <input value={title} onChange={(event) => setTitle(event.target.value)} />
       </label>
       <label className="field-label">
-        Kısa açıklama
+        {tr ? "Kısa açıklama" : "Short description"}
         <textarea rows={3} value={description} onChange={(event) => setDescription(event.target.value)} />
       </label>
       <div className="modal-actions">
         <div className="spacer" />
-        <button className="secondary-button" onClick={onClose}>Vazgeç</button>
+        <button className="secondary-button" onClick={onClose}>{tr ? "Vazgeç" : "Cancel"}</button>
         <button className="primary-button" disabled={!title.trim()} onClick={() => onSave(title.trim(), description.trim())}>
-          Kaydet
+          {tr ? "Kaydet" : "Save"}
         </button>
       </div>
     </Modal>

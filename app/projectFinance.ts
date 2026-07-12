@@ -1,14 +1,31 @@
-import type { Project, ProjectStatus } from "./types";
+import type { CurrencyCode, Language, Project, ProjectStatus } from "./types";
+
+export const currencyCodes: CurrencyCode[] = ["TRY", "USD", "EUR", "GBP"];
 
 export type PaymentState = "not-configured" | "unpaid" | "partial" | "paid" | "overpaid";
 
 export interface ProjectFinanceTotals {
+  currency: CurrencyCode;
   agreedKurus: number;
   collectedKurus: number;
   receivableKurus: number;
   collectionRate: number;
   paymentState: PaymentState;
 }
+
+export interface PortfolioCurrencyTotals {
+  activeWorkKurus: number;
+  receivableKurus: number;
+  collectedKurus: number;
+}
+
+export type PortfolioFinance = Record<CurrencyCode, PortfolioCurrencyTotals>;
+
+const emptyCurrencyTotals = (): PortfolioCurrencyTotals => ({
+  activeWorkKurus: 0,
+  receivableKurus: 0,
+  collectedKurus: 0,
+});
 
 export function getProjectStatus(project: Project): ProjectStatus {
   return project.status ?? "active";
@@ -38,6 +55,7 @@ export function getProjectFinanceTotals(project: Project): ProjectFinanceTotals 
           : "overpaid";
 
   return {
+    currency: project.finance?.currency ?? "TRY",
     agreedKurus,
     collectedKurus,
     receivableKurus,
@@ -46,19 +64,30 @@ export function getProjectFinanceTotals(project: Project): ProjectFinanceTotals 
   };
 }
 
-export function getPortfolioFinance(projects: Project[]) {
-  return projects.reduce(
-    (totals, project) => {
-      const finance = getProjectFinanceTotals(project);
-      if (!project.archived && getProjectStatus(project) === "active") {
-        totals.activeWorkKurus += finance.agreedKurus;
-      }
-      totals.receivableKurus += finance.receivableKurus;
-      totals.collectedKurus += finance.collectedKurus;
-      return totals;
-    },
-    { activeWorkKurus: 0, receivableKurus: 0, collectedKurus: 0 },
-  );
+export function getPortfolioFinance(projects: Project[]): PortfolioFinance {
+  const totals: PortfolioFinance = {
+    TRY: emptyCurrencyTotals(),
+    USD: emptyCurrencyTotals(),
+    EUR: emptyCurrencyTotals(),
+    GBP: emptyCurrencyTotals(),
+  };
+  for (const project of projects) {
+    const finance = getProjectFinanceTotals(project);
+    const currencyTotals = totals[finance.currency];
+    if (!project.archived && getProjectStatus(project) === "active") {
+      currencyTotals.activeWorkKurus += finance.agreedKurus;
+    }
+    currencyTotals.receivableKurus += finance.receivableKurus;
+    currencyTotals.collectedKurus += finance.collectedKurus;
+  }
+  return totals;
+}
+
+export function getPortfolioCurrencies(finance: PortfolioFinance, metric?: keyof PortfolioCurrencyTotals): CurrencyCode[] {
+  const used = currencyCodes.filter((currency) => metric
+    ? finance[currency][metric] > 0
+    : Object.values(finance[currency]).some((value) => value > 0));
+  return used.length ? used : ["TRY"];
 }
 
 export function transitionProjectStatus(
@@ -85,33 +114,58 @@ export function transitionProjectStatus(
   };
 }
 
-export function parseTryToKurus(raw: string): number | null {
+export function parseMoneyToMinor(raw: string): number | null {
   const compact = raw
     .trim()
     .replace(/\s/g, "")
-    .replace(/₺|TL/gi, "");
+    .replace(/[₺$€£]|TRY|USD|EUR|GBP|TL/gi, "");
   if (!compact || compact.startsWith("-") || !/^[0-9.,]+$/.test(compact)) return null;
 
+  const comma = compact.lastIndexOf(",");
+  const dot = compact.lastIndexOf(".");
   let normalized = compact;
-  if (compact.includes(",")) {
-    normalized = compact.replace(/\./g, "").replace(",", ".");
-  } else {
-    const dotCount = (compact.match(/\./g) ?? []).length;
-    const decimalLength = compact.includes(".") ? compact.length - compact.lastIndexOf(".") - 1 : 0;
-    if (dotCount > 1 || decimalLength === 3) normalized = compact.replace(/\./g, "");
+  if (comma >= 0 && dot >= 0) {
+    const decimalSeparator = comma > dot ? "," : ".";
+    const groupSeparator = decimalSeparator === "," ? "." : ",";
+    normalized = compact.split(groupSeparator).join("").replace(decimalSeparator, ".");
+  } else if (comma >= 0 || dot >= 0) {
+    const separator = comma >= 0 ? "," : ".";
+    const occurrences = compact.split(separator).length - 1;
+    const decimalLength = compact.length - compact.lastIndexOf(separator) - 1;
+    normalized = occurrences > 1 || decimalLength === 3
+      ? compact.split(separator).join("")
+      : compact.replace(separator, ".");
   }
 
   const amount = Number(normalized);
   if (!Number.isFinite(amount) || amount <= 0) return null;
-  const kurus = Math.round(amount * 100);
-  return Number.isSafeInteger(kurus) ? kurus : null;
+  const minor = Math.round(amount * 100);
+  return Number.isSafeInteger(minor) ? minor : null;
 }
 
-export function formatTryKurus(kurus: number, showKurus = false) {
-  return new Intl.NumberFormat("tr-TR", {
+export function formatMoney(
+  minor: number,
+  currency: CurrencyCode,
+  language: Language,
+  showMinor = false,
+): string {
+  return new Intl.NumberFormat(language === "tr" ? "tr-TR" : "en-GB", {
     style: "currency",
-    currency: "TRY",
-    maximumFractionDigits: showKurus ? 2 : 0,
-    minimumFractionDigits: showKurus ? 2 : 0,
-  }).format(kurus / 100);
+    currency,
+    maximumFractionDigits: showMinor ? 2 : 0,
+    minimumFractionDigits: showMinor ? 2 : 0,
+  }).format(minor / 100);
 }
+
+export function formatCompactMoney(minor: number, currency: CurrencyCode, language: Language): string {
+  return new Intl.NumberFormat(language === "tr" ? "tr-TR" : "en-GB", {
+    style: "currency",
+    currency,
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(minor / 100);
+}
+
+/** Backward-compatible aliases for portable backup consumers and older tests. */
+export const parseTryToKurus = parseMoneyToMinor;
+export const formatTryKurus = (kurus: number, showKurus = false) => formatMoney(kurus, "TRY", "tr", showKurus);

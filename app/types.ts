@@ -1,4 +1,6 @@
 export type ThemeId = "linen" | "night" | "sand" | "forest";
+export type Language = "tr" | "en";
+export type CurrencyCode = "TRY" | "USD" | "EUR" | "GBP";
 export type Priority = "low" | "medium" | "high" | "critical";
 export type ItemKind = "board" | "mindmap";
 export type ProjectStatus = "active" | "completed" | "delivered";
@@ -13,7 +15,8 @@ export interface ProjectPayment {
 }
 
 export interface ProjectFinance {
-  currency: "TRY";
+  currency: CurrencyCode;
+  /** Stored in the currency's minor unit (kuruş, cent or penny). */
   agreedAmountKurus: number;
   payments: ProjectPayment[];
 }
@@ -137,9 +140,14 @@ export interface LocalWorkspace {
 }
 
 export interface WorkspaceStore {
-  version: 2;
+  version: 3;
   activeWorkspaceId: string;
   workspaces: LocalWorkspace[];
+  preferences: {
+    language?: Language;
+    defaultCurrency: CurrencyCode;
+    freshInstallation: boolean;
+  };
   updatedAt: string;
 }
 

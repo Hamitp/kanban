@@ -1,4 +1,6 @@
-import type { AppData, KanbanBoard, MindMap, Project } from "./types";
+import type { AppData, KanbanBoard, Language, MindMap, Project } from "./types";
+
+const text = (language: Language, tr: string, en: string) => language === "tr" ? tr : en;
 
 const iso = (days = 0) => {
   const date = new Date();
@@ -13,7 +15,8 @@ export const newId = () =>
 
 export function createBoard(
   projectId: string,
-  title = "Yeni Kanban Board",
+  title?: string,
+  language: Language = "tr",
 ): KanbanBoard {
   const columnIds = Array.from({ length: 4 }, () => newId());
   const now = iso();
@@ -21,8 +24,8 @@ export function createBoard(
     id: newId(),
     kind: "board",
     projectId,
-    title,
-    description: "İşleri yakala, önceliklendir ve sakin bir akışta tamamla.",
+    title: title ?? text(language, "Yeni Kanban Board", "New Kanban Board"),
+    description: text(language, "İşleri yakala, önceliklendir ve sakin bir akışta tamamla.", "Capture, prioritize and complete work in a calm flow."),
     zoom: 1,
     archived: false,
     createdAt: now,
@@ -31,28 +34,28 @@ export function createBoard(
     columns: [
       {
         id: columnIds[0],
-        title: "Toplam İş Listesi",
+        title: text(language, "Toplam İş Listesi", "Backlog"),
         color: "#8b7cf6",
         role: "backlog",
         taskIds: [],
       },
       {
         id: columnIds[1],
-        title: "İş Listesi",
+        title: text(language, "İş Listesi", "Prioritized"),
         color: "#5d9cec",
         role: "planned",
         taskIds: [],
       },
       {
         id: columnIds[2],
-        title: "Üzerinde Çalışılanlar",
+        title: text(language, "Üzerinde Çalışılanlar", "In Progress"),
         color: "#f2a55f",
         role: "active",
         taskIds: [],
       },
       {
         id: columnIds[3],
-        title: "Tamamlananlar",
+        title: text(language, "Tamamlananlar", "Completed"),
         color: "#65af87",
         role: "done",
         taskIds: [],
@@ -63,15 +66,16 @@ export function createBoard(
 
 export function createMindMap(
   projectId: string,
-  title = "Yeni Zihin Haritası",
+  title?: string,
+  language: Language = "tr",
 ): MindMap {
   const now = iso();
   return {
     id: newId(),
     kind: "mindmap",
     projectId,
-    title,
-    description: "Fikirleri görünür hale getir ve aralarındaki bağı keşfet.",
+    title: title ?? text(language, "Yeni Zihin Haritası", "New Mind Map"),
+    description: text(language, "Fikirleri görünür hale getir ve aralarındaki bağı keşfet.", "Make ideas visible and discover the connections between them."),
     zoom: 1,
     archived: false,
     createdAt: now,
@@ -79,8 +83,8 @@ export function createMindMap(
     nodes: [
       {
         id: newId(),
-        title: "Ana fikir",
-        note: "Haritanızın merkez noktası",
+        title: text(language, "Ana fikir", "Main idea"),
+        note: text(language, "Haritanızın merkez noktası", "The center of your map"),
         x: 620,
         y: 340,
         color: "violet",
@@ -89,14 +93,14 @@ export function createMindMap(
   };
 }
 
-export function createSeedData(): AppData {
+export function createSeedData(language: Language = "tr"): AppData {
   const now = iso();
   const projectOne: Project = {
     id: newId(),
-    name: "Kanban Uygulaması",
-    description: "Yerel ve zarif çalışma alanı",
+    name: text(language, "Kanban Uygulaması", "Kanban Application"),
+    description: text(language, "Yerel ve zarif çalışma alanı", "A refined local workspace"),
     color: "#6f63d9",
-    clientName: "Örnek Müşteri",
+    clientName: text(language, "Örnek Müşteri", "Sample Client"),
     status: "active",
     finance: {
       currency: "TRY",
@@ -106,7 +110,7 @@ export function createSeedData(): AppData {
           id: newId(),
           amountKurus: 7_500_000,
           receivedOn: iso(-12).slice(0, 10),
-          note: "Başlangıç ödemesi",
+          note: text(language, "Başlangıç ödemesi", "Initial payment"),
           createdAt: iso(-12),
           updatedAt: iso(-12),
         },
@@ -118,8 +122,8 @@ export function createSeedData(): AppData {
   };
   const projectTwo: Project = {
     id: newId(),
-    name: "Kişisel Sistem",
-    description: "Haftalık plan ve gelişim alanı",
+    name: text(language, "Kişisel Sistem", "Personal System"),
+    description: text(language, "Haftalık plan ve gelişim alanı", "Weekly planning and growth space"),
     color: "#d27a55",
     status: "active",
     archived: false,
@@ -127,14 +131,14 @@ export function createSeedData(): AppData {
     updatedAt: now,
   };
 
-  const board = createBoard(projectOne.id, "Ürün Yol Haritası");
+  const board = createBoard(projectOne.id, text(language, "Ürün Yol Haritası", "Product Roadmap"), language);
   const [backlog, planned, active, done] = board.columns;
   const taskIds = Array.from({ length: 7 }, () => newId());
   board.tasks = {
     [taskIds[0]]: {
       id: taskIds[0],
-      title: "Çevrimdışı veri mimarisini kur",
-      description: "IndexedDB, otomatik kayıt ve dışa aktarma akışını tamamla.",
+      title: text(language, "Çevrimdışı veri mimarisini kur", "Build the offline data architecture"),
+      description: text(language, "IndexedDB, otomatik kayıt ve dışa aktarma akışını tamamla.", "Complete IndexedDB, automatic saving and export flows."),
       priority: "high",
       labelIds: ["label-product"],
       assigneeIds: ["member-hamit"],
@@ -144,8 +148,8 @@ export function createSeedData(): AppData {
     },
     [taskIds[1]]: {
       id: taskIds[1],
-      title: "Zihin haritası etkileşimlerini tasarla",
-      description: "Node ekleme, taşıma ve dal yapısının temel davranışları.",
+      title: text(language, "Zihin haritası etkileşimlerini tasarla", "Design mind map interactions"),
+      description: text(language, "Node ekleme, taşıma ve dal yapısının temel davranışları.", "Core behaviors for adding, moving and branching nodes."),
       priority: "medium",
       labelIds: ["label-design"],
       assigneeIds: ["member-hamit", "member-ayse"],
@@ -154,12 +158,12 @@ export function createSeedData(): AppData {
     },
     [taskIds[2]]: {
       id: taskIds[2],
-      title: "Paydaşlardan görsel geri bildirim al",
-      description: "İlk prototip için kısa değerlendirme oturumu.",
+      title: text(language, "Paydaşlardan görsel geri bildirim al", "Collect visual feedback from stakeholders"),
+      description: text(language, "İlk prototip için kısa değerlendirme oturumu.", "A short review session for the first prototype."),
       priority: "high",
       labelIds: ["label-waiting"],
       assigneeIds: ["member-mert"],
-      waitingReason: "Müşteriden toplantı tarihi bekleniyor",
+      waitingReason: text(language, "Müşteriden toplantı tarihi bekleniyor", "Waiting for the client to confirm a meeting date"),
       dueDate: iso(5).slice(0, 10),
       workSessions: [{ startedAt: iso(-3) }],
       createdAt: now,
@@ -167,8 +171,8 @@ export function createSeedData(): AppData {
     },
     [taskIds[3]]: {
       id: taskIds[3],
-      title: "Tema renklerini erişilebilirlik açısından kontrol et",
-      description: "Dört temada metin ve durum renklerinin kontrastını doğrula.",
+      title: text(language, "Tema renklerini erişilebilirlik açısından kontrol et", "Check theme colors for accessibility"),
+      description: text(language, "Dört temada metin ve durum renklerinin kontrastını doğrula.", "Verify text and status color contrast across all four themes."),
       priority: "medium",
       labelIds: ["label-design"],
       assigneeIds: ["member-ayse"],
@@ -177,8 +181,8 @@ export function createSeedData(): AppData {
     },
     [taskIds[4]]: {
       id: taskIds[4],
-      title: "İlk kullanıcı akışını yaz",
-      description: "Proje oluşturma ve ilk kartı ekleme adımlarını sadeleştir.",
+      title: text(language, "İlk kullanıcı akışını yaz", "Write the first user flow"),
+      description: text(language, "Proje oluşturma ve ilk kartı ekleme adımlarını sadeleştir.", "Simplify project creation and adding the first card."),
       priority: "low",
       labelIds: ["label-quick"],
       assigneeIds: ["member-hamit"],
@@ -187,8 +191,8 @@ export function createSeedData(): AppData {
     },
     [taskIds[5]]: {
       id: taskIds[5],
-      title: "Proje kapsamını netleştir",
-      description: "Kanban panosu, zihin haritası ve arşiv ihtiyaçları belirlendi.",
+      title: text(language, "Proje kapsamını netleştir", "Clarify the project scope"),
+      description: text(language, "Kanban panosu, zihin haritası ve arşiv ihtiyaçları belirlendi.", "Kanban board, mind map and archive requirements were defined."),
       priority: "medium",
       labelIds: ["label-product"],
       assigneeIds: ["member-hamit"],
@@ -199,8 +203,8 @@ export function createSeedData(): AppData {
     },
     [taskIds[6]]: {
       id: taskIds[6],
-      title: "GitHub deposunu hazırla",
-      description: "Açık depo ve MIT lisansı tamamlandı.",
+      title: text(language, "GitHub deposunu hazırla", "Prepare the GitHub repository"),
+      description: text(language, "Açık depo ve MIT lisansı tamamlandı.", "The public repository and MIT license are ready."),
       priority: "low",
       labelIds: ["label-quick"],
       assigneeIds: ["member-hamit"],
@@ -215,14 +219,14 @@ export function createSeedData(): AppData {
   active.taskIds = [taskIds[2]];
   done.taskIds = [taskIds[5], taskIds[6]];
 
-  const personalBoard = createBoard(projectTwo.id, "Haftalık Akış");
-  const map = createMindMap(projectOne.id, "Ürün Vizyonu");
+  const personalBoard = createBoard(projectTwo.id, text(language, "Haftalık Akış", "Weekly Flow"), language);
+  const map = createMindMap(projectOne.id, text(language, "Ürün Vizyonu", "Product Vision"), language);
   const root = map.nodes[0];
   map.nodes.push(
     {
       id: newId(),
-      title: "Sakin odak",
-      note: "Gürültüsüz ve motive edici arayüz",
+      title: text(language, "Sakin odak", "Calm focus"),
+      note: text(language, "Gürültüsüz ve motive edici arayüz", "A quiet and motivating interface"),
       x: 330,
       y: 180,
       color: "coral",
@@ -230,8 +234,8 @@ export function createSeedData(): AppData {
     },
     {
       id: newId(),
-      title: "Yerel güven",
-      note: "Çevrimdışı çalışma ve kolay yedek",
+      title: text(language, "Yerel güven", "Local confidence"),
+      note: text(language, "Çevrimdışı çalışma ve kolay yedek", "Offline work and effortless backups"),
       x: 930,
       y: 190,
       color: "sage",
@@ -239,8 +243,8 @@ export function createSeedData(): AppData {
     },
     {
       id: newId(),
-      title: "Düşünceden işe",
-      note: "Zihin haritası ile Kanban panosu arasında doğal geçiş",
+      title: text(language, "Düşünceden işe", "From thought to action"),
+      note: text(language, "Zihin haritası ile Kanban panosu arasında doğal geçiş", "A natural transition from mind map to Kanban board"),
       x: 930,
       y: 520,
       color: "blue",
@@ -250,7 +254,7 @@ export function createSeedData(): AppData {
 
   return {
     version: 1,
-    workspaceName: "Hamit'in Çalışma Alanı",
+    workspaceName: text(language, "Kişisel Alanım", "Personal Workspace"),
     theme: "linen",
     projects: [projectOne, projectTwo],
     boards: [board, personalBoard],
@@ -279,11 +283,11 @@ export function createSeedData(): AppData {
       },
     ],
     labels: [
-      { id: "label-waiting", name: "Müşteri bekleniyor", color: "#d88932" },
-      { id: "label-blocked", name: "Engellendi", color: "#ca5d65" },
-      { id: "label-product", name: "Ürün", color: "#6d61d4" },
-      { id: "label-design", name: "Tasarım", color: "#cc6887" },
-      { id: "label-quick", name: "Hızlı kazanım", color: "#4f9b79" },
+      { id: "label-waiting", name: text(language, "Müşteri bekleniyor", "Waiting for client"), color: "#d88932" },
+      { id: "label-blocked", name: text(language, "Engellendi", "Blocked"), color: "#ca5d65" },
+      { id: "label-product", name: text(language, "Ürün", "Product"), color: "#6d61d4" },
+      { id: "label-design", name: text(language, "Tasarım", "Design"), color: "#cc6887" },
+      { id: "label-quick", name: text(language, "Hızlı kazanım", "Quick win"), color: "#4f9b79" },
     ],
     lastOpened: { kind: "board", id: board.id },
     updatedAt: now,

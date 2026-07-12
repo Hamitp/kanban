@@ -34,13 +34,28 @@ test("v1 data migrates losslessly into the named personal workspace", () => {
   const store = normalizeWorkspaceStore(legacy);
 
   assert.ok(store);
-  assert.equal(store.version, 2);
+  assert.equal(store.version, 3);
+  assert.deepEqual(store.preferences, { defaultCurrency: "TRY", freshInstallation: false });
   assert.equal(store.workspaces.length, 1);
   assert.equal(store.workspaces[0].name, "Kişisel Alanım");
   assert.equal(store.workspaces[0].data.workspaceName, "Kişisel Alanım");
   assert.equal(store.workspaces[0].data.projects[0].finance.agreedAmountKurus, 250000);
   assert.equal(store.workspaces[0].data.boards[0].tasks["task-1"].title, "Özel görev");
   assert.equal(legacy.workspaceName, "Eski Alan");
+});
+
+test("v2 workspace stores migrate to v3 without changing workspace content", () => {
+  const stamp = "2026-04-01T00:00:00.000Z";
+  const v3 = createWorkspaceStoreFromLegacy(legacyData(), "personal", stamp);
+  const v2 = structuredClone(v3);
+  delete v2.preferences;
+  v2.version = 2;
+  const migrated = normalizeWorkspaceStore(v2);
+  assert.ok(migrated);
+  assert.equal(migrated.version, 3);
+  assert.equal(migrated.preferences.defaultCurrency, "TRY");
+  assert.equal(migrated.preferences.language, undefined);
+  assert.equal(migrated.workspaces[0].data.projects[0].name, "Özel Proje");
 });
 
 test("new workspaces are blank and stay isolated from personal data", () => {
