@@ -53,6 +53,7 @@ import {
   transitionProjectStatus,
 } from "./projectFinance";
 import { createBoard, createMindMap, createSeedData, newId } from "./seed";
+import { countMemberAssignments, removeMemberFromWorkspace } from "./memberManagement";
 import {
   getDesktopSaveInfo,
   getDesktopRecoveryInfo,
@@ -946,6 +947,22 @@ export default function AkisApp() {
                 ),
               }))
             }
+            onDeleteMember={(memberId) => {
+              const member = data.members.find((item) => item.id === memberId);
+              if (!member) return;
+              const assignmentCount = countMemberAssignments(data, memberId);
+              const assignmentNotice = assignmentCount > 0
+                ? `\n\n${assignmentCount} görevdeki kişi ataması kaldırılacak. Görevler silinmeyecek.`
+                : "";
+              if (!window.confirm(`${member.name} kişi dizininden silinsin mi?${assignmentNotice}`)) return;
+              commit((current) => removeMemberFromWorkspace(current, memberId, now()));
+              showToast(
+                assignmentCount > 0
+                  ? `${member.name} silindi; ${assignmentCount} görevdeki ataması kaldırıldı`
+                  : `${member.name} kişi dizininden silindi`,
+                true,
+              );
+            }}
             onExport={() => exportWorkspace(data)}
             onImport={(imported) => {
               pastRef.current = [...pastRef.current.slice(-39), data];
@@ -1242,6 +1259,7 @@ function ShellContent({
   onProfileName,
   onNewMember,
   onToggleMember,
+  onDeleteMember,
   onExport,
   onImport,
 }: {
@@ -1264,6 +1282,7 @@ function ShellContent({
   onProfileName: (name: string) => void;
   onNewMember: () => void;
   onToggleMember: (id: string) => void;
+  onDeleteMember: (id: string) => void;
   onExport: () => void;
   onImport: (data: AppData) => void;
 }) {
@@ -1375,6 +1394,7 @@ function ShellContent({
         onProfileName={onProfileName}
         onNewMember={onNewMember}
         onToggleMember={onToggleMember}
+        onDeleteMember={onDeleteMember}
         onExport={onExport}
         onImport={onImport}
       />
@@ -1804,6 +1824,7 @@ function SettingsScreen({
   onProfileName,
   onNewMember,
   onToggleMember,
+  onDeleteMember,
   onExport,
   onImport,
 }: {
@@ -1813,6 +1834,7 @@ function SettingsScreen({
   onProfileName: (name: string) => void;
   onNewMember: () => void;
   onToggleMember: (id: string) => void;
+  onDeleteMember: (id: string) => void;
   onExport: () => void;
   onImport: (data: AppData) => void;
 }) {
@@ -1843,7 +1865,7 @@ function SettingsScreen({
       <header className="page-header"><div><span className="eyebrow">TERCİHLER</span><h1>Ayarlar</h1><p>Çalışma alanınızı size ait hissettiren ayrıntılar.</p></div></header>
       <section className="settings-section"><div className="settings-heading"><h2>Çalışma alanı</h2><p>Profiliniz selamlamada ve avatarınızda; çalışma alanı adı ise tüm projelerinizin üzerinde görünür.</p></div><div className="settings-panel identity-settings"><label className="field-label">Profil adı<div className="inline-save"><input value={profileNameDraft} onChange={(event) => setProfileNameDraft(event.target.value)} placeholder="Örn. Hamit Parlak" /><button className="secondary-button" disabled={!profileNameDraft.trim() || profileNameDraft.trim() === currentProfileName} onClick={() => onProfileName(profileNameDraft.trim())}><Check size={15} /> Kaydet</button></div><small className="field-help">Yalnız bu cihazdaki kişisel selamlama için kullanılır.</small></label><label className="field-label">Çalışma alanı adı<div className="inline-save"><input value={name} onChange={(event) => setName(event.target.value)} /><button className="secondary-button" disabled={!name.trim() || name === data.workspaceName} onClick={() => onWorkspaceName(name.trim())}><Check size={15} /> Kaydet</button></div></label></div></section>
       <section className="settings-section"><div className="settings-heading"><h2>Tema</h2><p>Odak biçiminize uygun görünümü seçin.</p></div><div className="theme-grid">{themes.map((theme) => { const Icon = theme.icon; return <button key={theme.id} className={`theme-card ${theme.id} ${data.theme === theme.id ? "selected" : ""}`} aria-pressed={data.theme === theme.id} onClick={() => onTheme(theme.id)}><div className="theme-preview"><i /><i /><i /></div><span><Icon size={17} /><span><strong>{theme.name}</strong><small>{theme.description}</small></span>{data.theme === theme.id && <Check size={17} />}</span></button>; })}</div></section>
-      <section className="settings-section"><div className="settings-heading"><h2>Kişiler</h2><p>Görev atamak için yerel kişi dizininiz.</p></div><div className="settings-panel"><div className="members-header"><span>{data.members.filter((member) => member.active).length} aktif kişi</span><button className="secondary-button" onClick={onNewMember}><UserPlus size={16} /> Kişi ekle</button></div><div className="settings-members">{data.members.map((member) => <div key={member.id} className={!member.active ? "inactive" : ""}><span className="member-avatar" style={{ background: member.color }}>{member.initials}</span><span><strong>{member.name}</strong><small>{member.active ? "Aktif" : "Pasif · geçmiş atamalar korunur"}</small></span><button className="text-button" onClick={() => onToggleMember(member.id)}>{member.active ? "Pasifleştir" : "Etkinleştir"}</button></div>)}</div></div></section>
+      <section className="settings-section"><div className="settings-heading"><h2>Kişiler</h2><p>Görev atamak için yerel kişi dizininiz.</p></div><div className="settings-panel"><div className="members-header"><span>{data.members.filter((member) => member.active).length} aktif kişi</span><button className="secondary-button" onClick={onNewMember}><UserPlus size={16} /> Kişi ekle</button></div><div className="settings-members">{data.members.map((member) => <div key={member.id} className={!member.active ? "inactive" : ""}><span className="member-avatar" style={{ background: member.color }}>{member.initials}</span><span><strong>{member.name}</strong><small>{member.active ? "Aktif" : "Pasif · geçmiş atamalar korunur"}</small></span><div className="member-actions"><button className="text-button" onClick={() => onToggleMember(member.id)}>{member.active ? "Pasifleştir" : "Etkinleştir"}</button><button className="danger-ghost" onClick={() => onDeleteMember(member.id)} aria-label={`${member.name} kişisini sil`}><Trash2 size={15} /> Sil</button></div></div>)}</div></div></section>
       {desktopInfo ? (
         <section className="settings-section">
           <div className="settings-heading"><h2>Otomatik kayıt</h2><p>Hiçbir işlem yapmanız gerekmez. Akış bütün değişiklikleri dosyaya ve yedeklere kendisi yazar.</p></div>
