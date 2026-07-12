@@ -38,6 +38,7 @@ import {
   Undo2,
   Upload,
   UserPlus,
+  ChevronsUpDown,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -54,6 +55,17 @@ import {
 } from "./projectFinance";
 import { createBoard, createMindMap, createSeedData, newId } from "./seed";
 import { countMemberAssignments, removeMemberFromWorkspace } from "./memberManagement";
+import {
+  archiveWorkspace,
+  createBlankWorkspace,
+  createWorkspaceStoreFromLegacy,
+  deleteArchivedWorkspace,
+  getActiveWorkspace,
+  renameWorkspace,
+  restoreWorkspace,
+  switchWorkspace,
+  updateActiveWorkspaceData,
+} from "./workspaceManagement";
 import {
   getDesktopSaveInfo,
   getDesktopRecoveryInfo,
@@ -79,6 +91,8 @@ import type {
   Screen,
   TaskCard,
   ThemeId,
+  LocalWorkspace,
+  WorkspaceStore,
 } from "./types";
 
 type ModalState =
@@ -87,6 +101,7 @@ type ModalState =
   | { type: "item"; kind: ItemKind; projectId?: string }
   | { type: "duplicate"; kind: ItemKind; id: string }
   | { type: "member" }
+  | { type: "workspace"; workspaceId?: string }
   | null;
 
 interface ProjectDraft {
@@ -144,7 +159,7 @@ function getProfileInitials(profileName: string): string {
 }
 
 export default function AkisApp() {
-  const [data, setData] = useState<AppData | null>(null);
+  const [workspaceStore, setWorkspaceStore] = useState<WorkspaceStore | null>(null);
   const [screen, setScreen] = useState<Screen>({ kind: "home" });
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [modal, setModal] = useState<ModalState>(null);
@@ -155,19 +170,21 @@ export default function AkisApp() {
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [toast, setToast] = useState<{ message: string; undo?: boolean } | null>(null);
   const [historyVersion, setHistoryVersion] = useState(0);
-  const latestDataRef = useRef<AppData | null>(data);
+  const latestDataRef = useRef<WorkspaceStore | null>(workspaceStore);
   const pastRef = useRef<AppData[]>([]);
   const futureRef = useRef<AppData[]>([]);
   const hydrated = useRef(false);
+  const activeWorkspace = workspaceStore ? getActiveWorkspace(workspaceStore) : null;
+  const data = activeWorkspace?.data ?? null;
 
   useLayoutEffect(() => {
-    latestDataRef.current = data;
-  }, [data]);
+    latestDataRef.current = workspaceStore;
+  }, [workspaceStore]);
 
   useEffect(() => {
     loadWorkspace()
       .then(async (stored) => {
-        setData(stored ?? createSeedData());
+        setWorkspaceStore(stored ?? createWorkspaceStoreFromLegacy(createSeedData()));
         const recovery = await getDesktopRecoveryInfo();
         if (recovery?.recovered) {
           setToast({ message: "Son sağlam otomatik kopya güvenle geri yüklendi" });
@@ -189,14 +206,14 @@ export default function AkisApp() {
   );
 
   useEffect(() => {
-    if (!data || !hydrated.current) return;
+    if (!workspaceStore || !data || !hydrated.current) return;
     document.documentElement.dataset.theme = data.theme;
     let cancelled = false;
     let retryTimer: number | undefined;
     const persist = () => {
       if (cancelled) return;
       setSaveState("saving");
-      saveWorkspace(data)
+      saveWorkspace(workspaceStore)
         .then(() => {
           if (cancelled) return;
         setSaveState("saved");
@@ -215,7 +232,7 @@ export default function AkisApp() {
       window.clearTimeout(timer);
       if (retryTimer) window.clearTimeout(retryTimer);
     };
-  }, [data]);
+  }, [workspaceStore, data]);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -245,14 +262,15 @@ export default function AkisApp() {
   });
 
   const commit = useCallback((updater: (current: AppData) => AppData, track = true) => {
-    setData((current) => {
-      if (!current) return current;
+    setWorkspaceStore((currentStore) => {
+      if (!currentStore) return currentStore;
+      const current = getActiveWorkspace(currentStore)?.data;
+      if (!current) return currentStore;
       if (track) {
         pastRef.current = [...pastRef.current.slice(-39), current];
         futureRef.current = [];
       }
-      const updated = updater(current);
-      return { ...updated, updatedAt: now() };
+      return updateActiveWorkspaceData(currentStore, updater, now());
     });
     if (track) setHistoryVersion((value) => value + 1);
   }, []);
@@ -262,7 +280,7 @@ export default function AkisApp() {
     const previous = pastRef.current[pastRef.current.length - 1];
     pastRef.current = pastRef.current.slice(0, -1);
     futureRef.current = [data, ...futureRef.current.slice(0, 39)];
-    setData(previous);
+    setWorkspaceStore((current) => current ? updateActiveWorkspaceData(current, () => previous, now()) : current);
     setToast({ message: "Son işlem geri alındı" });
     setHistoryVersion((value) => value + 1);
   }
@@ -272,7 +290,7 @@ export default function AkisApp() {
     const next = futureRef.current[0];
     futureRef.current = futureRef.current.slice(1);
     pastRef.current = [...pastRef.current.slice(-39), data];
-    setData(next);
+    setWorkspaceStore((current) => current ? updateActiveWorkspaceData(current, () => next, now()) : current);
     setToast({ message: "İşlem yeniden uygulandı" });
     setHistoryVersion((value) => value + 1);
   }
@@ -321,6 +339,84 @@ export default function AkisApp() {
 
   function showToast(message: string, canUndo = false) {
     setToast({ message, undo: canUndo });
+  }
+
+  function clearWorkspaceContext() {
+    pastRef.current = [];
+    futureRef.current = [];
+    setHistoryVersion((value) => value + 1);
+    setScreen({ kind: "home" });
+    setModal(null);
+    setSearchQuery("");
+    setSearchOpen(false);
+  }
+
+  function activateWorkspace(workspaceId: string) {
+    if (!workspaceStore || workspaceId === workspaceStore.activeWorkspaceId) return;
+    const target = workspaceStore.workspaces.find((workspace) => workspace.id === workspaceId && !workspace.archived);
+    if (!target) return;
+    setWorkspaceStore((current) => current ? switchWorkspace(current, workspaceId, now()) : current);
+    clearWorkspaceContext();
+    showToast(`${target.name} çalışma alanına geçildi`);
+  }
+
+  function saveWorkspaceItem(name: string, color: string, workspaceId?: string) {
+    if (!workspaceStore || !data) return;
+    const cleanName = name.trim();
+    const normalizedName = cleanName.toLocaleLowerCase("tr-TR");
+    const duplicate = workspaceStore.workspaces.some((workspace) =>
+      workspace.id !== workspaceId && workspace.name.toLocaleLowerCase("tr-TR") === normalizedName,
+    );
+    if (!cleanName || duplicate) {
+      if (duplicate) window.alert("Bu adla bir çalışma alanı zaten var.");
+      return;
+    }
+    const stamp = now();
+    if (workspaceId) {
+      setWorkspaceStore((current) => current ? renameWorkspace(current, workspaceId, cleanName, stamp, color) : current);
+      setModal(null);
+      showToast("Çalışma alanı adı güncellendi");
+      return;
+    }
+    const workspace = createBlankWorkspace(newId(), cleanName, color, data, stamp);
+    setWorkspaceStore((current) => current ? {
+      ...current,
+      activeWorkspaceId: workspace.id,
+      workspaces: [...current.workspaces, workspace],
+      updatedAt: stamp,
+    } : current);
+    clearWorkspaceContext();
+    showToast(`${cleanName} çalışma alanı oluşturuldu`);
+  }
+
+  function archiveWorkspaceItem(workspaceId: string) {
+    if (!workspaceStore) return;
+    const workspace = workspaceStore.workspaces.find((item) => item.id === workspaceId && !item.archived);
+    const activeCount = workspaceStore.workspaces.filter((item) => !item.archived).length;
+    if (!workspace || activeCount <= 1) return;
+    if (!window.confirm(`${workspace.name} çalışma alanı arşivlensin mi? İçerikleri korunacak ve daha sonra geri getirilebilecek.`)) return;
+    const switching = workspaceStore.activeWorkspaceId === workspaceId;
+    setWorkspaceStore((current) => current ? archiveWorkspace(current, workspaceId, now()) : current);
+    if (switching) clearWorkspaceContext();
+    showToast(`${workspace.name} arşivlendi`);
+  }
+
+  function restoreWorkspaceItem(workspaceId: string) {
+    if (!workspaceStore) return;
+    const workspace = workspaceStore.workspaces.find((item) => item.id === workspaceId && item.archived);
+    if (!workspace) return;
+    setWorkspaceStore((current) => current ? restoreWorkspace(current, workspaceId, now()) : current);
+    showToast(`${workspace.name} geri getirildi`);
+  }
+
+  function deleteWorkspaceItem(workspaceId: string) {
+    if (!workspaceStore) return;
+    const workspace = workspaceStore.workspaces.find((item) => item.id === workspaceId && item.archived);
+    if (!workspace) return;
+    const summary = `${workspace.data.projects.length} proje, ${workspace.data.boards.length} Kanban panosu ve ${workspace.data.mindMaps.length} zihin haritası`;
+    if (!window.confirm(`${workspace.name} kalıcı olarak silinsin mi?\n\n${summary} silinecek. Bu işlem geri alınamaz.`)) return;
+    setWorkspaceStore((current) => current ? deleteArchivedWorkspace(current, workspaceId, now()) : current);
+    showToast(`${workspace.name} kalıcı olarak silindi`);
   }
 
   function saveProjectItem(draft: ProjectDraft, projectId?: string) {
@@ -502,9 +598,13 @@ export default function AkisApp() {
         open={sidebarOpen}
         screen={screen}
         projects={availableProjects}
+        workspaces={workspaceStore!.workspaces}
+        activeWorkspaceId={workspaceStore!.activeWorkspaceId}
         onToggle={() => setSidebarOpen((value) => !value)}
         onNavigate={navigate}
         onNewProject={() => setModal({ type: "project" })}
+        onSwitchWorkspace={activateWorkspace}
+        onNewWorkspace={() => setModal({ type: "workspace" })}
       />
       <div className="app-main">
         <Topbar
@@ -823,6 +923,8 @@ export default function AkisApp() {
           <ShellContent
             screen={screen}
             data={data}
+            workspaces={workspaceStore!.workspaces}
+            activeWorkspaceId={workspaceStore!.activeWorkspaceId}
             onNavigate={navigate}
             onModal={setModal}
             onArchiveItem={archiveItem}
@@ -936,7 +1038,7 @@ export default function AkisApp() {
               showToast("Görev, toplam görev listesine eklendi");
             }}
             onTheme={(theme) => commit((current) => ({ ...current, theme }), false)}
-            onWorkspaceName={(workspaceName) => commit((current) => ({ ...current, workspaceName }))}
+            onWorkspaceName={(workspaceName) => saveWorkspaceItem(workspaceName, activeWorkspace!.color, activeWorkspace!.id)}
             onProfileName={(profileName) => commit((current) => ({ ...current, profileName }))}
             onNewMember={() => setModal({ type: "member" })}
             onToggleMember={(memberId) =>
@@ -967,10 +1069,18 @@ export default function AkisApp() {
             onImport={(imported) => {
               pastRef.current = [...pastRef.current.slice(-39), data];
               futureRef.current = [];
-              setData({ ...imported, updatedAt: now() });
+              setWorkspaceStore((current) => current
+                ? updateActiveWorkspaceData(current, () => ({ ...imported, workspaceName: activeWorkspace!.name }), now())
+                : current);
               setHistoryVersion((value) => value + 1);
               showToast("Yedek başarıyla geri yüklendi", true);
             }}
+            onNewWorkspace={() => setModal({ type: "workspace" })}
+            onEditWorkspace={(workspaceId) => setModal({ type: "workspace", workspaceId })}
+            onSwitchWorkspace={activateWorkspace}
+            onArchiveWorkspace={archiveWorkspaceItem}
+            onRestoreWorkspace={restoreWorkspaceItem}
+            onDeleteWorkspace={deleteWorkspaceItem}
           />
         )}
       </div>
@@ -1038,6 +1148,14 @@ export default function AkisApp() {
           }}
         />
       )}
+      {modal?.type === "workspace" && (
+        <WorkspaceModal
+          workspace={modal.workspaceId ? workspaceStore!.workspaces.find((item) => item.id === modal.workspaceId) : undefined}
+          existingNames={workspaceStore!.workspaces.map((item) => item.name)}
+          onClose={() => setModal(null)}
+          onSave={(name, color) => saveWorkspaceItem(name, color, modal.workspaceId)}
+        />
+      )}
 
       {toast && (
         <div className="toast" role="status">
@@ -1055,17 +1173,28 @@ function Sidebar({
   open,
   screen,
   projects,
+  workspaces,
+  activeWorkspaceId,
   onToggle,
   onNavigate,
   onNewProject,
+  onSwitchWorkspace,
+  onNewWorkspace,
 }: {
   open: boolean;
   screen: Screen;
   projects: Project[];
+  workspaces: LocalWorkspace[];
+  activeWorkspaceId: string;
   onToggle: () => void;
   onNavigate: (screen: Screen) => void;
   onNewProject: () => void;
+  onSwitchWorkspace: (id: string) => void;
+  onNewWorkspace: () => void;
 }) {
+  const [workspaceMenu, setWorkspaceMenu] = useState(false);
+  const activeWorkspace = workspaces.find((workspace) => workspace.id === activeWorkspaceId);
+  const visibleWorkspaces = workspaces.filter((workspace) => !workspace.archived);
   const nav = [
     { kind: "home" as const, label: "Genel Bakış", icon: Home },
     { kind: "projects" as const, label: "Projeler", icon: FolderKanban },
@@ -1083,6 +1212,32 @@ function Sidebar({
         <button className="icon-button sidebar-toggle" onClick={onToggle} aria-label={open ? "Menüyü daralt" : "Menüyü genişlet"}>
           {open ? <PanelLeftClose size={17} /> : <PanelLeftOpen size={17} />}
         </button>
+      </div>
+      <div className={`workspace-switcher ${workspaceMenu ? "open" : ""}`}>
+        <button
+          className="workspace-switcher-button"
+          onClick={() => { if (!open) { onToggle(); setWorkspaceMenu(true); } else setWorkspaceMenu((value) => !value); }}
+          aria-label="Çalışma alanını değiştir"
+          aria-expanded={workspaceMenu}
+          title={!open ? activeWorkspace?.name : undefined}
+        >
+          <i style={{ background: activeWorkspace?.color }} />
+          {open && <span><small>ÇALIŞMA ALANI</small><strong>{activeWorkspace?.name}</strong></span>}
+          {open && <ChevronsUpDown size={15} />}
+        </button>
+        {workspaceMenu && (
+          <div className="workspace-switcher-menu" role="menu">
+            <header>Çalışma alanları</header>
+            {visibleWorkspaces.map((workspace) => (
+              <button key={workspace.id} role="menuitem" className={workspace.id === activeWorkspaceId ? "active" : ""} onClick={() => { setWorkspaceMenu(false); onSwitchWorkspace(workspace.id); }}>
+                <i style={{ background: workspace.color }} />
+                <span>{workspace.name}</span>
+                {workspace.id === activeWorkspaceId && <Check size={15} />}
+              </button>
+            ))}
+            <button role="menuitem" className="new-workspace" onClick={() => { setWorkspaceMenu(false); onNewWorkspace(); }}><Plus size={15} /> Yeni çalışma alanı</button>
+          </div>
+        )}
       </div>
       <nav className="main-nav" aria-label="Ana menü">
         {nav.map((item) => {
@@ -1242,6 +1397,8 @@ function Topbar({
 function ShellContent({
   screen,
   data,
+  workspaces,
+  activeWorkspaceId,
   onNavigate,
   onModal,
   onArchiveItem,
@@ -1262,9 +1419,17 @@ function ShellContent({
   onDeleteMember,
   onExport,
   onImport,
+  onNewWorkspace,
+  onEditWorkspace,
+  onSwitchWorkspace,
+  onArchiveWorkspace,
+  onRestoreWorkspace,
+  onDeleteWorkspace,
 }: {
   screen: Screen;
   data: AppData;
+  workspaces: LocalWorkspace[];
+  activeWorkspaceId: string;
   onNavigate: (screen: Screen) => void;
   onModal: (modal: ModalState) => void;
   onArchiveItem: (kind: ItemKind, id: string) => void;
@@ -1285,6 +1450,12 @@ function ShellContent({
   onDeleteMember: (id: string) => void;
   onExport: () => void;
   onImport: (data: AppData) => void;
+  onNewWorkspace: () => void;
+  onEditWorkspace: (id: string) => void;
+  onSwitchWorkspace: (id: string) => void;
+  onArchiveWorkspace: (id: string) => void;
+  onRestoreWorkspace: (id: string) => void;
+  onDeleteWorkspace: (id: string) => void;
 }) {
   if (screen.kind === "home") {
     return (
@@ -1388,7 +1559,10 @@ function ShellContent({
   if (screen.kind === "settings") {
     return (
       <SettingsScreen
+        key={`${activeWorkspaceId}:${data.workspaceName}`}
         data={data}
+        workspaces={workspaces}
+        activeWorkspaceId={activeWorkspaceId}
         onTheme={onTheme}
         onWorkspaceName={onWorkspaceName}
         onProfileName={onProfileName}
@@ -1397,6 +1571,12 @@ function ShellContent({
         onDeleteMember={onDeleteMember}
         onExport={onExport}
         onImport={onImport}
+        onNewWorkspace={onNewWorkspace}
+        onEditWorkspace={onEditWorkspace}
+        onSwitchWorkspace={onSwitchWorkspace}
+        onArchiveWorkspace={onArchiveWorkspace}
+        onRestoreWorkspace={onRestoreWorkspace}
+        onDeleteWorkspace={onDeleteWorkspace}
       />
     );
   }
@@ -1819,6 +1999,8 @@ function ArchiveScreen({ data, onRestore, onDelete }: { data: AppData; onRestore
 
 function SettingsScreen({
   data,
+  workspaces,
+  activeWorkspaceId,
   onTheme,
   onWorkspaceName,
   onProfileName,
@@ -1827,8 +2009,16 @@ function SettingsScreen({
   onDeleteMember,
   onExport,
   onImport,
+  onNewWorkspace,
+  onEditWorkspace,
+  onSwitchWorkspace,
+  onArchiveWorkspace,
+  onRestoreWorkspace,
+  onDeleteWorkspace,
 }: {
   data: AppData;
+  workspaces: LocalWorkspace[];
+  activeWorkspaceId: string;
   onTheme: (theme: ThemeId) => void;
   onWorkspaceName: (name: string) => void;
   onProfileName: (name: string) => void;
@@ -1837,12 +2027,19 @@ function SettingsScreen({
   onDeleteMember: (id: string) => void;
   onExport: () => void;
   onImport: (data: AppData) => void;
+  onNewWorkspace: () => void;
+  onEditWorkspace: (id: string) => void;
+  onSwitchWorkspace: (id: string) => void;
+  onArchiveWorkspace: (id: string) => void;
+  onRestoreWorkspace: (id: string) => void;
+  onDeleteWorkspace: (id: string) => void;
 }) {
   const [name, setName] = useState(data.workspaceName);
   const currentProfileName = resolveProfileName(data);
   const [profileNameDraft, setProfileNameDraft] = useState(currentProfileName);
   const fileRef = useRef<HTMLInputElement>(null);
   const [desktopInfo, setDesktopInfo] = useState<DesktopSaveInfo | null>(null);
+  const activeWorkspaceCount = workspaces.filter((workspace) => !workspace.archived).length;
   useEffect(() => {
     getDesktopSaveInfo().then(setDesktopInfo).catch(() => undefined);
   }, []);
@@ -1863,6 +2060,31 @@ function SettingsScreen({
   return (
     <main className="shell-page settings-page">
       <header className="page-header"><div><span className="eyebrow">TERCİHLER</span><h1>Ayarlar</h1><p>Çalışma alanınızı size ait hissettiren ayrıntılar.</p></div></header>
+      <section className="settings-section workspace-settings-section">
+        <div className="settings-heading"><h2>Çalışma alanları</h2><p>Kişisel ve iş içeriklerinizi birbirinden tamamen ayrı tutun.</p></div>
+        <div className="settings-panel">
+          <div className="members-header"><span>{activeWorkspaceCount} aktif · {workspaces.filter((workspace) => workspace.archived).length} arşivde</span><button className="secondary-button" onClick={onNewWorkspace}><Plus size={16} /> Yeni çalışma alanı</button></div>
+          <div className="workspace-management-list">
+            {workspaces.map((workspace) => {
+              const isActive = workspace.id === activeWorkspaceId;
+              const taskCount = workspace.data.boards.reduce((sum, board) => sum + Object.keys(board.tasks).length, 0);
+              return (
+                <div key={workspace.id} className={`${workspace.archived ? "archived" : ""} ${isActive ? "current" : ""}`}>
+                  <i style={{ background: workspace.color }} />
+                  <span><strong>{workspace.name}</strong><small>{workspace.archived ? "Arşivlendi" : isActive ? "Şu anda açık" : `${workspace.data.projects.length} proje · ${taskCount} görev`}</small></span>
+                  <div className="workspace-row-actions">
+                    {workspace.archived ? (
+                      <><button className="text-button" onClick={() => onRestoreWorkspace(workspace.id)}><RotateCcw size={14} /> Geri getir</button><button className="danger-ghost" onClick={() => onDeleteWorkspace(workspace.id)}><Trash2 size={14} /> Kalıcı sil</button></>
+                    ) : (
+                      <>{!isActive && <button className="text-button" onClick={() => onSwitchWorkspace(workspace.id)}>Aç</button>}<button className="text-button" onClick={() => onEditWorkspace(workspace.id)}><Pencil size={14} /> Adlandır</button><button className="danger-ghost" disabled={activeWorkspaceCount <= 1} onClick={() => onArchiveWorkspace(workspace.id)}><Archive size={14} /> Arşivle</button></>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
       <section className="settings-section"><div className="settings-heading"><h2>Çalışma alanı</h2><p>Profiliniz selamlamada ve avatarınızda; çalışma alanı adı ise tüm projelerinizin üzerinde görünür.</p></div><div className="settings-panel identity-settings"><label className="field-label">Profil adı<div className="inline-save"><input value={profileNameDraft} onChange={(event) => setProfileNameDraft(event.target.value)} placeholder="Örn. Hamit Parlak" /><button className="secondary-button" disabled={!profileNameDraft.trim() || profileNameDraft.trim() === currentProfileName} onClick={() => onProfileName(profileNameDraft.trim())}><Check size={15} /> Kaydet</button></div><small className="field-help">Yalnız bu cihazdaki kişisel selamlama için kullanılır.</small></label><label className="field-label">Çalışma alanı adı<div className="inline-save"><input value={name} onChange={(event) => setName(event.target.value)} /><button className="secondary-button" disabled={!name.trim() || name === data.workspaceName} onClick={() => onWorkspaceName(name.trim())}><Check size={15} /> Kaydet</button></div></label></div></section>
       <section className="settings-section"><div className="settings-heading"><h2>Tema</h2><p>Odak biçiminize uygun görünümü seçin.</p></div><div className="theme-grid">{themes.map((theme) => { const Icon = theme.icon; return <button key={theme.id} className={`theme-card ${theme.id} ${data.theme === theme.id ? "selected" : ""}`} aria-pressed={data.theme === theme.id} onClick={() => onTheme(theme.id)}><div className="theme-preview"><i /><i /><i /></div><span><Icon size={17} /><span><strong>{theme.name}</strong><small>{theme.description}</small></span>{data.theme === theme.id && <Check size={17} />}</span></button>; })}</div></section>
       <section className="settings-section"><div className="settings-heading"><h2>Kişiler</h2><p>Görev atamak için yerel kişi dizininiz.</p></div><div className="settings-panel"><div className="members-header"><span>{data.members.filter((member) => member.active).length} aktif kişi</span><button className="secondary-button" onClick={onNewMember}><UserPlus size={16} /> Kişi ekle</button></div><div className="settings-members">{data.members.map((member) => <div key={member.id} className={!member.active ? "inactive" : ""}><span className="member-avatar" style={{ background: member.color }}>{member.initials}</span><span><strong>{member.name}</strong><small>{member.active ? "Aktif" : "Pasif · geçmiş atamalar korunur"}</small></span><div className="member-actions"><button className="text-button" onClick={() => onToggleMember(member.id)}>{member.active ? "Pasifleştir" : "Etkinleştir"}</button><button className="danger-ghost" onClick={() => onDeleteMember(member.id)} aria-label={`${member.name} kişisini sil`}><Trash2 size={15} /> Sil</button></div></div>)}</div></div></section>
@@ -2010,6 +2232,36 @@ function MemberModal({ onClose, onSave }: { onClose: () => void; onSave: (name: 
   const [name, setName] = useState("");
   const [color, setColor] = useState(projectColors[2]);
   return <BaseModal title="Çalışma alanına kişi ekle" subtitle="Bu kişi yerel görev atamalarında kullanılacak." onClose={onClose}><label className="field-label">Ad soyad<input autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder="Örn. Deniz Yılmaz" /></label><div className="field-label">Avatar rengi<div className="color-picker-row">{projectColors.map((value) => <button key={value} className={color === value ? "selected" : ""} style={{ background: value }} onClick={() => setColor(value)} aria-label={`${value} avatar rengini seç`} aria-pressed={color === value} />)}</div></div><div className="modal-actions"><div className="spacer" /><button className="secondary-button" onClick={onClose}>Vazgeç</button><button className="primary-button" disabled={!name.trim()} onClick={() => onSave(name.trim(), color)}>Kişiyi ekle</button></div></BaseModal>;
+}
+
+function WorkspaceModal({
+  workspace,
+  existingNames,
+  onClose,
+  onSave,
+}: {
+  workspace?: LocalWorkspace;
+  existingNames: string[];
+  onClose: () => void;
+  onSave: (name: string, color: string) => void;
+}) {
+  const [name, setName] = useState(workspace?.name ?? "");
+  const [color, setColor] = useState(workspace?.color ?? projectColors[0]);
+  const normalized = name.trim().toLocaleLowerCase("tr-TR");
+  const duplicate = existingNames.some((existing) => existing !== workspace?.name && existing.toLocaleLowerCase("tr-TR") === normalized);
+  const valid = Boolean(normalized) && !duplicate;
+  return (
+    <BaseModal
+      title={workspace ? "Çalışma alanını yeniden adlandır" : "Yeni çalışma alanı"}
+      subtitle={workspace ? "Yeni ad yalnızca bu çalışma alanını etkiler." : "Projeleri, finansı, kişileri ve aramaları tamamen ayrı yeni bir alan oluşturun."}
+      onClose={onClose}
+    >
+      <label className="field-label">Çalışma alanı adı<input autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder="Örn. Şirket Projeleri" />{duplicate && <span className="field-error">Bu adla bir çalışma alanı zaten var.</span>}</label>
+      <div className="field-label">Alan rengi<div className="color-picker-row">{projectColors.map((value) => <button key={value} className={color === value ? "selected" : ""} style={{ background: value }} onClick={() => setColor(value)} aria-label={`${value} çalışma alanı rengini seç`} aria-pressed={color === value} />)}</div></div>
+      <div className="workspace-privacy-note"><ShieldCheck size={18} /><span><strong>Tamamen yerel ve ayrı</strong><small>Bu alanda yalnızca burada oluşturduğunuz proje, finans, kişi ve çalışmalar görünür.</small></span></div>
+      <div className="modal-actions"><div className="spacer" /><button className="secondary-button" onClick={onClose}>Vazgeç</button><button className="primary-button" disabled={!valid} onClick={() => onSave(name.trim(), color)}>{workspace ? "Adı kaydet" : "Çalışma alanını oluştur"}</button></div>
+    </BaseModal>
+  );
 }
 
 function BaseModal({ title, subtitle, onClose, children }: { title: string; subtitle: string; onClose: () => void; children: React.ReactNode }) {

@@ -126,6 +126,23 @@ export interface AppData {
   updatedAt: string;
 }
 
+export interface LocalWorkspace {
+  id: string;
+  name: string;
+  color: string;
+  archived: boolean;
+  createdAt: string;
+  updatedAt: string;
+  data: AppData;
+}
+
+export interface WorkspaceStore {
+  version: 2;
+  activeWorkspaceId: string;
+  workspaces: LocalWorkspace[];
+  updatedAt: string;
+}
+
 export type Screen =
   | { kind: "home" }
   | { kind: "projects" }

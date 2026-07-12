@@ -27,6 +27,8 @@ Değişiklik olduğunda saatlik güvenlik kopyaları `Belgeler\Akış\Save\Backu
 
 ## Başlıca özellikler
 
+- Kişisel ve iş projelerini birbirinden ayıran, adı ve rengi değiştirilebilen bağımsız çalışma alanları
+- Biten çalışma alanlarını arşivleme, geri getirme ve yalnızca arşivden kalıcı olarak silme
 - Proje başına birden fazla özelleştirilebilir Kanban panosu ve zihin haritası
 - Boş alanda sol tuşla veya orta tuşla gezinen; `Ctrl + fare tekerleği` ile yakınlaşan çalışma alanları
 - Sürükle-bırak, görünür bırakma hedefleri, kenarda otomatik kaydırma ve klavyeyle görev taşıma

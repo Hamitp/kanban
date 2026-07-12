@@ -1,5 +1,5 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
-import type { AppData } from "./types";
+import type { AppData, LocalWorkspace, WorkspaceStore } from "./types";
 import type { DesktopSaveInfo } from "./desktop";
 
 const DB_NAME = "akis-workspace";
@@ -388,6 +388,61 @@ export function normalizeWorkspaceData(value: unknown): AppData | null {
   return result as unknown as AppData;
 }
 
+function normalizeLocalWorkspace(value: unknown): LocalWorkspace | null {
+  if (!isRecord(value)) return null;
+  const id = identifier(value.id);
+  const name = identifier(value.name);
+  const data = normalizeWorkspaceData(value.data);
+  if (!id || !name || !data) return null;
+  const createdAt = timestampValue(value.createdAt, data.updatedAt);
+  const updatedAt = timestampValue(value.updatedAt, data.updatedAt);
+  return {
+    id,
+    name,
+    color: stringValue(value.color, "#6558c7")!,
+    archived: typeof value.archived === "boolean" ? value.archived : false,
+    createdAt,
+    updatedAt,
+    data: { ...data, workspaceName: name },
+  };
+}
+
+export function normalizeWorkspaceStore(value: unknown): WorkspaceStore | null {
+  if (isRecord(value) && value.version === 2 && Array.isArray(value.workspaces)) {
+    const workspaces = value.workspaces.map(normalizeLocalWorkspace);
+    if (workspaces.some((workspace) => !workspace)) return null;
+    const normalized = workspaces as LocalWorkspace[];
+    if (normalized.length === 0 || new Set(normalized.map((workspace) => workspace.id)).size !== normalized.length) return null;
+    const activeWorkspaceId = identifier(value.activeWorkspaceId);
+    const active = normalized.find((workspace) => workspace.id === activeWorkspaceId && !workspace.archived);
+    const fallback = normalized.find((workspace) => !workspace.archived);
+    if (!fallback) return null;
+    return {
+      version: 2,
+      activeWorkspaceId: active?.id ?? fallback.id,
+      workspaces: normalized,
+      updatedAt: timestampValue(value.updatedAt, fallback.updatedAt),
+    };
+  }
+  const legacy = normalizeWorkspaceData(value);
+  if (!legacy) return null;
+  const name = "Kişisel Alanım";
+  return {
+    version: 2,
+    activeWorkspaceId: "workspace-personal",
+    workspaces: [{
+      id: "workspace-personal",
+      name,
+      color: "#6558c7",
+      archived: false,
+      createdAt: legacy.updatedAt,
+      updatedAt: legacy.updatedAt,
+      data: { ...legacy, workspaceName: name },
+    }],
+    updatedAt: legacy.updatedAt,
+  };
+}
+
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, 1);
@@ -402,39 +457,39 @@ function openDatabase(): Promise<IDBDatabase> {
   });
 }
 
-export async function loadWorkspace(): Promise<AppData | null> {
+export async function loadWorkspace(): Promise<WorkspaceStore | null> {
   if (isTauri()) {
     const result = await invoke<TauriLoadResult>("load");
     tauriRecoveryInfo = fromTauriRecovery(result.recovery);
     if (result.recovery.status === "required") throw new Error("WORKSPACE_RECOVERY_REQUIRED");
-    const normalized = normalizeWorkspaceData(result.data);
+    const normalized = normalizeWorkspaceStore(result.data);
     if (result.data !== null && !normalized) throw new Error("WORKSPACE_DEEP_VALIDATION_FAILED");
     return normalized;
   }
   try {
     const db = await openDatabase();
-    const value = await new Promise<AppData | null>((resolve, reject) => {
+    const value = await new Promise<unknown>((resolve, reject) => {
       const transaction = db.transaction(STORE_NAME, "readonly");
       const request = transaction.objectStore(STORE_NAME).get(STATE_KEY);
-      request.onsuccess = () => resolve((request.result as AppData) ?? null);
+      request.onsuccess = () => resolve(request.result ?? null);
       request.onerror = () => reject(request.error);
     });
     db.close();
-    const normalized = normalizeWorkspaceData(value);
+    const normalized = normalizeWorkspaceStore(value);
     if (normalized) return normalized;
   } catch {
     // Fall through to the independent localStorage snapshot.
   }
   try {
     const fallback = localStorage.getItem(FALLBACK_KEY);
-    return fallback ? normalizeWorkspaceData(JSON.parse(fallback)) : null;
+    return fallback ? normalizeWorkspaceStore(JSON.parse(fallback)) : null;
   } catch {
     return null;
   }
 }
 
-export async function saveWorkspace(data: AppData): Promise<void> {
-  const normalized = normalizeWorkspaceData(data);
+export async function saveWorkspace(data: WorkspaceStore): Promise<void> {
+  const normalized = normalizeWorkspaceStore(data);
   if (!normalized) throw new Error("INVALID_WORKSPACE");
   if (isTauri()) {
     await invoke("save", { data: normalized });
@@ -470,7 +525,7 @@ export async function getDesktopRecoveryInfo(): Promise<WorkspaceRecoveryInfo | 
 }
 
 export function registerDesktopFlushProvider(
-  provider: () => AppData | null | Promise<AppData | null>,
+  provider: () => WorkspaceStore | null | Promise<WorkspaceStore | null>,
   onError?: () => void,
 ): () => void {
   if (isTauri()) {
@@ -491,7 +546,7 @@ export function registerDesktopFlushProvider(
               if (!disposed) await currentWindow.destroy();
               return;
             }
-            const normalized = normalizeWorkspaceData(snapshot);
+            const normalized = normalizeWorkspaceStore(snapshot);
             if (!normalized) throw new Error("INVALID_WORKSPACE_FLUSH_SNAPSHOT");
             await invoke("save", { data: normalized });
             if (!disposed) await currentWindow.destroy();
@@ -525,4 +580,8 @@ export async function openDesktopSaveFolder(): Promise<void> {
 
 export function isWorkspaceData(value: unknown): value is AppData {
   return normalizeWorkspaceData(value) !== null;
+}
+
+export function isWorkspaceStore(value: unknown): value is WorkspaceStore {
+  return normalizeWorkspaceStore(value) !== null;
 }
