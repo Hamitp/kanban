@@ -184,15 +184,18 @@ export default function AkisApp() {
   useEffect(() => {
     loadWorkspace()
       .then(async (stored) => {
+        // Mark hydration before publishing the loaded store so legacy-to-v2
+        // normalization is persisted immediately, even without a user action.
+        hydrated.current = true;
         setWorkspaceStore(stored ?? createWorkspaceStoreFromLegacy(createSeedData()));
         const recovery = await getDesktopRecoveryInfo();
         if (recovery?.recovered) {
           setToast({ message: "Son sağlam otomatik kopya güvenle geri yüklendi" });
         }
       })
-      .catch(() => setFatalLoadError(true))
-      .finally(() => {
+      .catch(() => {
         hydrated.current = true;
+        setFatalLoadError(true);
       });
     if (!isDesktopRuntime()) navigator.storage?.persist?.().catch(() => undefined);
   }, []);
