@@ -62,5 +62,6 @@ test("Windows distribution uses a compact current-user NSIS installer", async ()
   assert.deepEqual(tauri.bundle.targets, ["nsis"]);
   assert.equal(tauri.bundle.windows.nsis.installMode, "currentUser");
   assert.equal(tauri.identifier, "com.hamitparlak.akis");
+  assert.equal(tauri.app.windows[0].dragDropEnabled, false);
   assert.match(mainText, /windows_subsystem = "windows"/);
 });
