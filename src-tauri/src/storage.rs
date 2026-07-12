@@ -939,7 +939,7 @@ mod tests {
         let loaded = load_workspace_at(&paths, &runtime).expect("v2 load");
 
         assert_eq!(loaded.data, Some(expected));
-        assert_eq!(loaded.recovery.status, "clean");
+        assert_eq!(loaded.recovery.status, "none");
     }
 
     #[test]
