@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useI18n } from "../i18n";
-import type { MindMap, MindNode } from "../types";
+import type { KanbanBoard, MindMap, MindNode } from "../types";
 import { CanvasZoomControls } from "./CanvasZoomControls";
 import { useCanvasPan } from "./useCanvasPan";
 import { useCanvasZoom } from "./useCanvasZoom";
@@ -39,6 +39,7 @@ const nodeHeight = 78;
 interface MindMapViewProps {
   map: MindMap;
   projectName: string;
+  boards: KanbanBoard[];
   onBack: () => void;
   onRename: (title: string, description: string) => void;
   onArchive: () => void;
@@ -49,11 +50,14 @@ interface MindMapViewProps {
   onDeleteNode: (nodeId: string) => void;
   onAutoLayout: () => void;
   onZoomChange: (zoom: number) => void;
+  onCreateTaskFromNode: (nodeId: string, boardId: string, columnId: string) => void;
+  onOpenLinkedTask: (boardId: string, taskId: string) => void;
 }
 
 export function MindMapView({
   map,
   projectName,
+  boards,
   onBack,
   onRename,
   onArchive,
@@ -64,6 +68,8 @@ export function MindMapView({
   onDeleteNode,
   onAutoLayout,
   onZoomChange,
+  onCreateTaskFromNode,
+  onOpenLinkedTask,
 }: MindMapViewProps) {
   const { language } = useI18n();
   const tr = language === "tr";
@@ -354,7 +360,10 @@ export function MindMapView({
           <NodeInspector
             key={selected.id}
             node={selected}
+            boards={boards}
             onCollapse={() => setInspectorOpen(false)}
+            onCreateTask={(boardId, columnId) => onCreateTaskFromNode(selected.id, boardId, columnId)}
+            onOpenLinkedTask={onOpenLinkedTask}
             onUpdate={(patch) => onUpdateNode(selected.id, patch)}
             onDelete={() => {
               const childCount = map.nodes.filter((node) => node.parentId === selected.id).length;
@@ -372,11 +381,14 @@ export function MindMapView({
   );
 }
 
-function NodeInspector({ node, onUpdate, onDelete, onCollapse }: { node: MindNode; onUpdate: (patch: Partial<MindNode>) => void; onDelete: () => void; onCollapse: () => void }) {
+function NodeInspector({ node, boards, onUpdate, onDelete, onCollapse, onCreateTask, onOpenLinkedTask }: { node: MindNode; boards: KanbanBoard[]; onUpdate: (patch: Partial<MindNode>) => void; onDelete: () => void; onCollapse: () => void; onCreateTask: (boardId: string, columnId: string) => void; onOpenLinkedTask: (boardId: string, taskId: string) => void }) {
   const { language } = useI18n();
   const tr = language === "tr";
   const [title, setTitle] = useState(node.title);
   const [note, setNote] = useState(node.note);
+  const [boardId, setBoardId] = useState(boards[0]?.id ?? "");
+  const targetBoard = boards.find((board) => board.id === boardId) ?? boards[0];
+  const [columnId, setColumnId] = useState(targetBoard?.columns[0]?.id ?? "");
   const onUpdateRef = useRef(onUpdate);
   const draftRef = useRef({ title, note });
   const persistedRef = useRef({ title: node.title, note: node.note });
@@ -440,6 +452,14 @@ function NodeInspector({ node, onUpdate, onDelete, onCollapse }: { node: MindNod
           ))}
         </div>
       </div>
+      <section className="idea-to-task">
+        <span className="eyebrow">{tr ? "FİKİRDEN EYLEME" : "IDEA TO ACTION"}</span>
+        {node.linkedTask ? (
+          <><strong>{tr ? "Bu fikir bir Kanban görevine bağlı" : "This idea is linked to a Kanban task"}</strong><button className="secondary-button wide" onClick={() => onOpenLinkedTask(node.linkedTask!.boardId, node.linkedTask!.taskId)}><ListTree size={16} /> {tr ? "Bağlı görevi aç" : "Open linked task"}</button></>
+        ) : boards.length ? (
+          <><strong>{tr ? "Fikri görev olarak planla" : "Plan this idea as a task"}</strong><select value={targetBoard?.id ?? ""} onChange={(event) => { const next = boards.find((board) => board.id === event.target.value); setBoardId(event.target.value); setColumnId(next?.columns[0]?.id ?? ""); }}>{boards.map((board) => <option key={board.id} value={board.id}>{board.title}</option>)}</select><select value={columnId} onChange={(event) => setColumnId(event.target.value)}>{targetBoard?.columns.map((column) => <option key={column.id} value={column.id}>{column.title}</option>)}</select><button className="primary-button wide" disabled={!targetBoard || !columnId} onClick={() => targetBoard && onCreateTask(targetBoard.id, columnId)}><Plus size={16} /> {tr ? "Kanban görevine dönüştür" : "Convert to Kanban task"}</button></>
+        ) : <small>{tr ? "Önce bu projede bir Kanban panosu oluşturun." : "Create a Kanban board in this project first."}</small>}
+      </section>
       {node.parentId && <button className="danger-ghost wide" onClick={onDelete}><Trash2 size={16} /> {tr ? "Bu dalı sil" : "Delete this branch"}</button>}
       <div className="inspector-tip"><Minus size={14} /><span>{tr ? "İpucu: Fikir kartını sürükleyerek konumlandırın; boş alanı sürükleyerek haritada gezinin." : "Tip: Drag idea cards to position them; drag empty space to pan around the map."}</span></div>
     </aside>

@@ -13,6 +13,11 @@ const COLUMN_ROLES = new Set(["backlog", "planned", "active", "done"]);
 const ITEM_KINDS = new Set(["board", "mindmap"]);
 const LANGUAGES = new Set(["tr", "en"]);
 const CURRENCIES = new Set(["TRY", "USD", "EUR", "GBP"]);
+const EFFORT_POINTS = new Set([1, 2, 3, 5, 8]);
+const ISSUE_STATUSES = new Set(["open", "investigating", "implementing", "verifying", "closed"]);
+const ISSUE_SEVERITIES = new Set(["low", "medium", "high", "critical"]);
+const CALENDAR_EVENT_TYPES = new Set(["meeting", "planned", "note"]);
+const SOURCE_LINK_KINDS = new Set(["mindnode", "issue", "corrective-action"]);
 const EPOCH = "1970-01-01T00:00:00.000Z";
 
 type UnknownRecord = Record<string, unknown>;
@@ -199,6 +204,7 @@ function normalizeTask(value: unknown, fallbackTimestamp: string, fallbackId: st
     priority: PRIORITIES.has(value.priority as string) ? value.priority : "medium",
     labelIds,
     assigneeIds,
+    effortPoints: EFFORT_POINTS.has(value.effortPoints as number) ? value.effortPoints : 1,
     createdAt,
     updatedAt: timestampValue(value.updatedAt, createdAt),
   };
@@ -216,6 +222,41 @@ function normalizeTask(value: unknown, fallbackTimestamp: string, fallbackId: st
     if (!sessions) return null;
     task.workSessions = sessions;
   }
+  const transitions = value.transitions === undefined ? [] : normalizedRecordArray(value.transitions, (transition) => {
+    if (!isRecord(transition)) return null;
+    const id = identifier(transition.id);
+    const toColumnId = identifier(transition.toColumnId);
+    if (!id || !toColumnId) return null;
+    const normalized: UnknownRecord = {
+      id,
+      occurredAt: timestampValue(transition.occurredAt, createdAt),
+      toColumnId,
+      inferred: transition.inferred === true,
+    };
+    if (!optionalString(normalized, "fromColumnId", transition.fromColumnId)) return null;
+    for (const key of ["fromRole", "toRole"]) {
+      if (transition[key] !== undefined) {
+        if (!COLUMN_ROLES.has(transition[key] as string)) return null;
+        normalized[key] = transition[key];
+      }
+    }
+    return normalized;
+  });
+  if (!transitions) return null;
+  task.transitions = transitions;
+  const sourceLinks = value.sourceLinks === undefined ? [] : normalizedRecordArray(value.sourceLinks, (link) => {
+    if (!isRecord(link) || !SOURCE_LINK_KINDS.has(link.kind as string)) return null;
+    const sourceId = identifier(link.sourceId);
+    if (!sourceId) return null;
+    const normalized: UnknownRecord = {
+      kind: link.kind,
+      sourceId,
+      createdAt: timestampValue(link.createdAt, createdAt),
+    };
+    return optionalString(normalized, "containerId", link.containerId) ? normalized : null;
+  });
+  if (!sourceLinks) return null;
+  task.sourceLinks = sourceLinks;
   return task;
 }
 
@@ -256,6 +297,20 @@ function normalizeBoard(value: unknown, fallbackTimestamp: string): UnknownRecor
     });
   }
   (columns[0].taskIds as string[]).push(...Object.keys(tasks).filter((taskId) => !placedTasks.has(taskId)));
+  for (const column of columns) {
+    for (const taskId of column.taskIds as string[]) {
+      const task = tasks[taskId] as UnknownRecord;
+      if ((task.transitions as UnknownRecord[]).length === 0) {
+        task.transitions = [{
+          id: `migration-${taskId}`,
+          occurredAt: task.createdAt,
+          toColumnId: column.id,
+          ...(column.role ? { toRole: column.role } : {}),
+          inferred: true,
+        }];
+      }
+    }
+  }
   const createdAt = timestampValue(value.createdAt, fallbackTimestamp);
   const board: UnknownRecord = {
     id,
@@ -288,6 +343,17 @@ function normalizeMindNode(value: unknown): UnknownRecord | null {
   };
   if (!optionalString(node, "parentId", value.parentId)) return null;
   if (!optionalString(node, "linkedTaskId", value.linkedTaskId)) return null;
+  if (value.linkedTask !== undefined) {
+    if (!isRecord(value.linkedTask)) return null;
+    const boardId = identifier(value.linkedTask.boardId);
+    const taskId = identifier(value.linkedTask.taskId);
+    if (!boardId || !taskId) return null;
+    node.linkedTask = {
+      boardId,
+      taskId,
+      createdAt: timestampValue(value.linkedTask.createdAt),
+    };
+  }
   return node;
 }
 
@@ -338,16 +404,161 @@ function normalizeMindMap(value: unknown, fallbackTimestamp: string): UnknownRec
   return map;
 }
 
+function normalizeLinkedTask(value: unknown, fallbackTimestamp: string): UnknownRecord | null | undefined {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) return null;
+  const boardId = identifier(value.boardId);
+  const taskId = identifier(value.taskId);
+  return boardId && taskId
+    ? { boardId, taskId, createdAt: timestampValue(value.createdAt, fallbackTimestamp) }
+    : null;
+}
+
+function normalizeCorrectiveAction(value: unknown, fallbackTimestamp: string): UnknownRecord | null {
+  if (!isRecord(value)) return null;
+  const id = identifier(value.id);
+  const title = stringValue(value.title);
+  const assigneeIds = normalizedStringArray(value.assigneeIds);
+  if (!id || title === undefined || !assigneeIds) return null;
+  const createdAt = timestampValue(value.createdAt, fallbackTimestamp);
+  const linkedTask = normalizeLinkedTask(value.linkedTask, createdAt);
+  if (linkedTask === null) return null;
+  const action: UnknownRecord = {
+    id,
+    title,
+    description: stringValue(value.description, ""),
+    assigneeIds,
+    effortPoints: EFFORT_POINTS.has(value.effortPoints as number) ? value.effortPoints : 1,
+    createdAt,
+    updatedAt: timestampValue(value.updatedAt, createdAt),
+  };
+  if (!optionalString(action, "dueDate", value.dueDate)) return null;
+  if (linkedTask) action.linkedTask = linkedTask;
+  return action;
+}
+
+function normalizeIssue(value: unknown, fallbackTimestamp: string): UnknownRecord | null {
+  if (!isRecord(value)) return null;
+  const id = identifier(value.id);
+  const projectId = identifier(value.projectId);
+  const title = stringValue(value.title);
+  const assigneeIds = normalizedStringArray(value.assigneeIds);
+  if (!id || !projectId || title === undefined || !assigneeIds) return null;
+  const createdAt = timestampValue(value.createdAt, fallbackTimestamp);
+  const evidence = value.evidence === undefined ? [] : normalizedRecordArray(value.evidence, (entry) => {
+    if (!isRecord(entry)) return null;
+    const evidenceId = identifier(entry.id);
+    const text = stringValue(entry.text);
+    return evidenceId && text !== undefined
+      ? { id: evidenceId, text, createdAt: timestampValue(entry.createdAt, createdAt) }
+      : null;
+  });
+  const whys = value.whys === undefined ? [] : normalizedRecordArray(value.whys, (entry) => {
+    if (!isRecord(entry)) return null;
+    const whyId = identifier(entry.id);
+    return whyId
+      ? {
+          id: whyId,
+          answer: stringValue(entry.answer, ""),
+          evidence: stringValue(entry.evidence, ""),
+          validated: entry.validated === true,
+        }
+      : null;
+  });
+  const fishbone = value.fishbone === undefined ? [] : normalizedRecordArray(value.fishbone, (category) => {
+    if (!isRecord(category)) return null;
+    const categoryId = identifier(category.id);
+    const name = stringValue(category.name);
+    const causes = category.causes === undefined ? [] : normalizedRecordArray(category.causes, (cause) => {
+      if (!isRecord(cause)) return null;
+      const causeId = identifier(cause.id);
+      return causeId
+        ? {
+            id: causeId,
+            text: stringValue(cause.text, ""),
+            evidence: stringValue(cause.evidence, ""),
+            rootCause: cause.rootCause === true,
+          }
+        : null;
+    });
+    return categoryId && name !== undefined && causes ? { id: categoryId, name, causes } : null;
+  });
+  const actions = value.actions === undefined
+    ? []
+    : normalizedRecordArray(value.actions, (action) => normalizeCorrectiveAction(action, createdAt));
+  if (!evidence || !whys || !fishbone || !actions) return null;
+  const a3Source = isRecord(value.a3) ? value.a3 : {};
+  const issue: UnknownRecord = {
+    id,
+    projectId,
+    title,
+    description: stringValue(value.description, ""),
+    impact: stringValue(value.impact, ""),
+    severity: ISSUE_SEVERITIES.has(value.severity as string) ? value.severity : "medium",
+    status: ISSUE_STATUSES.has(value.status as string) ? value.status : "open",
+    assigneeIds,
+    observedOn: stringValue(value.observedOn, createdAt.slice(0, 10)),
+    evidence,
+    whys,
+    fishbone,
+    rootCause: stringValue(value.rootCause, ""),
+    actions,
+    a3: {
+      background: stringValue(a3Source.background, ""),
+      currentState: stringValue(a3Source.currentState, ""),
+      targetState: stringValue(a3Source.targetState, ""),
+      rootCauseSummary: stringValue(a3Source.rootCauseSummary, ""),
+      countermeasures: stringValue(a3Source.countermeasures, ""),
+      implementationPlan: stringValue(a3Source.implementationPlan, ""),
+      verificationResult: stringValue(a3Source.verificationResult, ""),
+      standardization: stringValue(a3Source.standardization, ""),
+      lessonsLearned: stringValue(a3Source.lessonsLearned, ""),
+    },
+    verificationNote: stringValue(value.verificationNote, ""),
+    createdAt,
+    updatedAt: timestampValue(value.updatedAt, createdAt),
+  };
+  for (const key of ["boardId", "taskId", "followUpDate", "closedAt"]) {
+    if (!optionalString(issue, key, value[key])) return null;
+  }
+  if (typeof value.verificationEffective === "boolean") issue.verificationEffective = value.verificationEffective;
+  return issue;
+}
+
+function normalizeCalendarEvent(value: unknown, fallbackTimestamp: string): UnknownRecord | null {
+  if (!isRecord(value)) return null;
+  const id = identifier(value.id);
+  const title = stringValue(value.title);
+  const date = stringValue(value.date);
+  if (!id || title === undefined || !date) return null;
+  const createdAt = timestampValue(value.createdAt, fallbackTimestamp);
+  const event: UnknownRecord = {
+    id,
+    title,
+    date,
+    type: CALENDAR_EVENT_TYPES.has(value.type as string) ? value.type : "planned",
+    note: stringValue(value.note, ""),
+    createdAt,
+    updatedAt: timestampValue(value.updatedAt, createdAt),
+  };
+  for (const key of ["startTime", "endTime", "projectId"]) {
+    if (!optionalString(event, key, value[key])) return null;
+  }
+  return event;
+}
+
 export function normalizeWorkspaceData(value: unknown): AppData | null {
-  const wrapped = isRecord(value) && isRecord(value.data) && value.version !== 1 ? value.data : value;
+  const wrapped = isRecord(value) && isRecord(value.data) && value.version !== 1 && value.version !== 2 ? value.data : value;
   if (
     !isRecord(wrapped) ||
-    wrapped.version !== 1 ||
+    (wrapped.version !== 1 && wrapped.version !== 2) ||
     !Array.isArray(wrapped.projects) ||
     !Array.isArray(wrapped.boards) ||
     !Array.isArray(wrapped.mindMaps) ||
     !Array.isArray(wrapped.members) ||
-    !Array.isArray(wrapped.labels)
+    !Array.isArray(wrapped.labels) ||
+    (wrapped.issues !== undefined && !Array.isArray(wrapped.issues)) ||
+    (wrapped.calendarEvents !== undefined && !Array.isArray(wrapped.calendarEvents))
   ) {
     return null;
   }
@@ -357,7 +568,9 @@ export function normalizeWorkspaceData(value: unknown): AppData | null {
   const mindMaps = normalizedRecordArray(wrapped.mindMaps, (map) => normalizeMindMap(map, updatedAt));
   const members = normalizedRecordArray(wrapped.members, normalizeMember);
   const labels = normalizedRecordArray(wrapped.labels, normalizeLabel);
-  const groups = [projects, boards, mindMaps, members, labels];
+  const issues = normalizedRecordArray(wrapped.issues ?? [], (issue) => normalizeIssue(issue, updatedAt));
+  const calendarEvents = normalizedRecordArray(wrapped.calendarEvents ?? [], (event) => normalizeCalendarEvent(event, updatedAt));
+  const groups = [projects, boards, mindMaps, members, labels, issues, calendarEvents];
   if (groups.some((group) => !group)) return null;
   for (const group of groups as UnknownRecord[][]) {
     if (new Set(group.map((item) => item.id)).size !== group.length) return null;
@@ -365,11 +578,46 @@ export function normalizeWorkspaceData(value: unknown): AppData | null {
   const normalizedProjects = projects as UnknownRecord[];
   const normalizedBoards = boards as UnknownRecord[];
   const normalizedMindMaps = mindMaps as UnknownRecord[];
+  const normalizedIssues = issues as UnknownRecord[];
+  const normalizedCalendarEvents = calendarEvents as UnknownRecord[];
   const projectIds = new Set(normalizedProjects.map((project) => project.id));
   if (normalizedBoards.some((board) => !projectIds.has(board.projectId))) return null;
   if (normalizedMindMaps.some((map) => !projectIds.has(map.projectId))) return null;
+  if (normalizedIssues.some((issue) => !projectIds.has(issue.projectId))) return null;
+  const boardById = new Map(normalizedBoards.map((board) => [board.id as string, board]));
+  const linkedTaskExists = (link: unknown) => {
+    if (!isRecord(link)) return false;
+    const board = boardById.get(link.boardId as string);
+    return Boolean(board && isRecord(board.tasks) && typeof link.taskId === "string" && isRecord(board.tasks[link.taskId]));
+  };
+  for (const map of normalizedMindMaps) {
+    if (!Array.isArray(map.nodes)) continue;
+    for (const node of map.nodes) {
+      if (isRecord(node) && node.linkedTask && !linkedTaskExists(node.linkedTask)) {
+        delete node.linkedTask;
+        delete node.linkedTaskId;
+      }
+    }
+  }
+  for (const issue of normalizedIssues) {
+    const linkedBoard = typeof issue.boardId === "string" ? boardById.get(issue.boardId) : undefined;
+    if (issue.boardId && (!linkedBoard || linkedBoard.projectId !== issue.projectId)) {
+      delete issue.boardId;
+      delete issue.taskId;
+    } else if (issue.taskId && (!linkedBoard || !isRecord(linkedBoard.tasks) || !isRecord(linkedBoard.tasks[issue.taskId as string]))) {
+      delete issue.taskId;
+    }
+    if (Array.isArray(issue.actions)) {
+      for (const action of issue.actions) {
+        if (isRecord(action) && action.linkedTask && !linkedTaskExists(action.linkedTask)) delete action.linkedTask;
+      }
+    }
+  }
+  for (const event of normalizedCalendarEvents) {
+    if (event.projectId && !projectIds.has(event.projectId)) delete event.projectId;
+  }
   const result: UnknownRecord = {
-    version: 1,
+    version: 2,
     workspaceName: stringValue(wrapped.workspaceName, "Akis Calisma Alani"),
     theme: THEMES.has(wrapped.theme as string) ? wrapped.theme : "linen",
     projects: normalizedProjects,
@@ -377,6 +625,8 @@ export function normalizeWorkspaceData(value: unknown): AppData | null {
     mindMaps: normalizedMindMaps,
     members: members as UnknownRecord[],
     labels: labels as UnknownRecord[],
+    issues: normalizedIssues,
+    calendarEvents: normalizedCalendarEvents,
     updatedAt,
   };
   if (!optionalString(result, "profileName", wrapped.profileName)) return null;
@@ -410,7 +660,7 @@ function normalizeLocalWorkspace(value: unknown): LocalWorkspace | null {
 }
 
 export function normalizeWorkspaceStore(value: unknown): WorkspaceStore | null {
-  if (isRecord(value) && (value.version === 2 || value.version === 3) && Array.isArray(value.workspaces)) {
+  if (isRecord(value) && (value.version === 2 || value.version === 3 || value.version === 4) && Array.isArray(value.workspaces)) {
     const workspaces = value.workspaces.map(normalizeLocalWorkspace);
     if (workspaces.some((workspace) => !workspace)) return null;
     const normalized = workspaces as LocalWorkspace[];
@@ -425,13 +675,13 @@ export function normalizeWorkspaceStore(value: unknown): WorkspaceStore | null {
       ? rawPreferences.defaultCurrency as "TRY" | "USD" | "EUR" | "GBP"
       : "TRY";
     return {
-      version: 3,
+      version: 4,
       activeWorkspaceId: active?.id ?? fallback.id,
       workspaces: normalized,
       preferences: {
         language,
         defaultCurrency,
-        freshInstallation: value.version === 3 && rawPreferences.freshInstallation === true,
+        freshInstallation: (value.version === 3 || value.version === 4) && rawPreferences.freshInstallation === true,
       },
       updatedAt: timestampValue(value.updatedAt, fallback.updatedAt),
     };
@@ -440,7 +690,7 @@ export function normalizeWorkspaceStore(value: unknown): WorkspaceStore | null {
   if (!legacy) return null;
   const name = "Kişisel Alanım";
   return {
-    version: 3,
+    version: 4,
     activeWorkspaceId: "workspace-personal",
     workspaces: [{
       id: "workspace-personal",

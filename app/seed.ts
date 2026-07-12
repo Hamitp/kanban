@@ -253,7 +253,7 @@ export function createSeedData(language: Language = "tr"): AppData {
   );
 
   return {
-    version: 1,
+    version: 2,
     workspaceName: text(language, "Kişisel Alanım", "Personal Workspace"),
     theme: "linen",
     projects: [projectOne, projectTwo],
@@ -289,6 +289,8 @@ export function createSeedData(language: Language = "tr"): AppData {
       { id: "label-design", name: text(language, "Tasarım", "Design"), color: "#cc6887" },
       { id: "label-quick", name: text(language, "Hızlı kazanım", "Quick win"), color: "#4f9b79" },
     ],
+    issues: [],
+    calendarEvents: [],
     lastOpened: { kind: "board", id: board.id },
     updatedAt: now,
   };

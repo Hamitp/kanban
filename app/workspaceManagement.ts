@@ -9,7 +9,7 @@ export function createWorkspaceStoreFromLegacy(
 ): WorkspaceStore {
   const migratedData = { ...data, workspaceName: PERSONAL_WORKSPACE_NAME };
   return {
-    version: 3,
+    version: 4,
     activeWorkspaceId: workspaceId,
     workspaces: [{
       id: workspaceId,
@@ -28,7 +28,7 @@ export function createWorkspaceStoreFromLegacy(
 export function createFreshWorkspaceStore(stamp = new Date().toISOString()): WorkspaceStore {
   const name = "Akış / Flow";
   const data: AppData = {
-    version: 1,
+    version: 2,
     workspaceName: name,
     theme: "linen",
     projects: [],
@@ -36,10 +36,12 @@ export function createFreshWorkspaceStore(stamp = new Date().toISOString()): Wor
     mindMaps: [],
     members: [],
     labels: [],
+    issues: [],
+    calendarEvents: [],
     updatedAt: stamp,
   };
   return {
-    version: 3,
+    version: 4,
     activeWorkspaceId: "workspace-personal",
     workspaces: [{
       id: "workspace-personal",
@@ -82,7 +84,7 @@ export function createBlankWorkspace(
     createdAt: stamp,
     updatedAt: stamp,
     data: {
-      version: 1,
+      version: 2,
       workspaceName: name,
       profileName: source.profileName,
       theme: source.theme,
@@ -91,6 +93,8 @@ export function createBlankWorkspace(
       mindMaps: [],
       members: [],
       labels: [],
+      issues: [],
+      calendarEvents: [],
       updatedAt: stamp,
     },
   };

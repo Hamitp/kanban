@@ -10,6 +10,7 @@ import {
   ChevronRight,
   CircleAlert,
   Copy,
+  GitBranch,
   GripVertical,
   Hand,
   MoreHorizontal,
@@ -27,8 +28,10 @@ import { useI18n } from "../i18n";
 import { newId } from "../seed";
 import { formatTaskWorkDuration, getTaskWorkMs } from "../taskTiming";
 import { getBoardFlowStats } from "../workspaceAnalytics";
+import { effortPointOptions } from "../v4Workflows";
 import type {
   BoardColumn,
+  EffortPoints,
   KanbanBoard,
   LabelDefinition,
   Member,
@@ -62,6 +65,7 @@ interface BoardViewProps {
   ) => void;
   onAddLabel: (name: string, color: string) => string;
   onZoomChange: (zoom: number) => void;
+  onOpenTaskSource: (task: TaskCard) => void;
 }
 
 const priorityNames: Record<Priority, string> = {
@@ -93,6 +97,7 @@ export function BoardView({
   onReorderColumn,
   onSaveTask,
   onDeleteTask,
+  onOpenTaskSource,
   onMoveTask,
   onAddLabel,
   onZoomChange,
@@ -224,6 +229,7 @@ export function BoardView({
         title: "",
         description: "",
         priority: "medium",
+        effortPoints: 1,
         labelIds: [],
         assigneeIds: [],
         createdAt: now,
@@ -449,6 +455,7 @@ export function BoardView({
             onDeleteTask(selected.columnId, selected.task.id);
             setSelected(null);
           }}
+          onOpenSource={() => onOpenTaskSource(selected.task)}
         />
       )}
 
@@ -566,6 +573,7 @@ function TaskCardView({
           <GripVertical size={14} />
           <span className={`priority-dot ${task.priority}`} />
           <span>{tr ? priorityNames[task.priority] : ({ low: "Low", medium: "Medium", high: "High", critical: "Critical" } as Record<Priority, string>)[task.priority]}</span>
+          <span className="effort-badge">{task.effortPoints ?? 1} {tr ? "puan" : "pts"}</span>
         </div>
         <h3>{task.title}</h3>
         {task.waitingReason && (
@@ -626,6 +634,7 @@ function TaskPanel({
   onSave,
   onDelete,
   onAddLabel,
+  onOpenSource,
 }: {
   task: TaskCard;
   isNew: boolean;
@@ -637,6 +646,7 @@ function TaskPanel({
   onSave: (task: TaskCard, targetColumnId: string, placement?: TaskPlacement) => void;
   onDelete: () => void;
   onAddLabel: (name: string, color: string) => string;
+  onOpenSource: () => void;
 }) {
   const { language } = useI18n();
   const tr = language === "tr";
@@ -752,6 +762,12 @@ function TaskPanel({
               </select>
             </label>
             <label className="field-label">
+              {tr ? "İş yükü puanı" : "Effort points"}
+              <select value={draft.effortPoints ?? 1} onChange={(event) => setDraft({ ...draft, effortPoints: Number(event.target.value) as EffortPoints })}>
+                {effortPointOptions.map((point) => <option key={point} value={point}>{point}</option>)}
+              </select>
+            </label>
+            <label className="field-label">
               {tr ? "Son tarih" : "Due date"}
               <input
                 type="date"
@@ -760,6 +776,7 @@ function TaskPanel({
               />
             </label>
           </div>
+          {(draft.sourceLinks?.length ?? 0) > 0 && <button type="button" className="task-source-note" onClick={onOpenSource}><GitBranch size={15} /><span>{tr ? "Bu görev bir analiz veya zihin haritasından oluşturuldu. Kaynağı aç." : "This task was created from an analysis or mind map. Open its source."}</span><ChevronRight size={15} /></button>}
           <label className="field-label">
             {tr ? "Bekleme / engel nedeni" : "Waiting / blocker reason"}
             <div className="input-with-icon">
