@@ -2,12 +2,15 @@
 
 import {
   Archive,
+  ArrowLeft,
   ArrowRight,
   BadgeDollarSign,
   BarChart3,
   Blocks,
   Check,
   CheckCircle2,
+  CalendarDays,
+  ChevronDown,
   ChevronRight,
   CircleAlert,
   Copy,
@@ -41,11 +44,15 @@ import {
   UserPlus,
   ChevronsUpDown,
   X,
+  Wrench,
 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { BoardView } from "./components/BoardView";
 import { InsightsScreen } from "./components/InsightsScreen";
 import { MindMapView } from "./components/MindMapView";
+import { BurnupChart } from "./components/BurnupChart";
+import { CalendarScreen } from "./components/CalendarScreen";
+import { IssueDetailScreen, ProblemsScreen } from "./components/ProblemSolvingScreen";
 import {
   currencyCodes,
   formatMoney,
@@ -83,17 +90,24 @@ import {
 } from "./storage";
 import { formatTaskWorkDuration, getTaskWorkMs, transitionTaskTiming } from "./taskTiming";
 import { getBoardFlowStats, getProjectFlowStats } from "./workspaceAnalytics";
+import {
+  appendTaskTransition,
+  createProblemIssue,
+} from "./v4Workflows";
 import type { DesktopSaveInfo } from "./desktop";
 import type {
   AppData,
+  CalendarEvent,
   CurrencyCode,
   ItemKind,
+  LinkedTaskReference,
   KanbanBoard,
   MindMap,
   MindNode,
   Project,
   ProjectPayment,
   ProjectStatus,
+  ProblemIssue,
   Screen,
   TaskCard,
   ThemeId,
@@ -655,6 +669,7 @@ export default function AkisApp() {
           projects={data.projects}
           boards={data.boards}
           mindMaps={data.mindMaps}
+          issues={data.issues}
           query={searchQuery}
           searchOpen={searchOpen}
           saveState={saveState}
@@ -715,7 +730,11 @@ export default function AkisApp() {
                     ? Object.fromEntries(Object.entries(board.tasks).map(([taskId, task]) => [
                         taskId,
                         existingColumn.taskIds.includes(taskId)
-                          ? transitionTaskTiming(task, existingColumn.role, role, changedAt)
+                          ? appendTaskTransition(
+                              transitionTaskTiming(task, existingColumn.role, role, changedAt),
+                              { fromColumnId: existingColumn.id, toColumnId: existingColumn.id, fromRole: existingColumn.role, toRole: role, occurredAt: changedAt },
+                              newId(),
+                            )
                           : task,
                       ]))
                     : board.tasks;
@@ -756,24 +775,33 @@ export default function AkisApp() {
                 }),
               }))
             }
-            onSaveTask={(columnId, task, isNew) =>
+            onSaveTask={(columnId, task, isNew) => {
+              const savedAt = now();
               commit((current) => ({
                 ...current,
                 boards: current.boards.map((board) => {
                   if (board.id !== currentBoard.id) return board;
+                  const column = board.columns.find((item) => item.id === columnId);
+                  const savedTask = isNew && column
+                    ? appendTaskTransition(
+                        { ...task, effortPoints: task.effortPoints ?? 1 },
+                        { toColumnId: column.id, toRole: column.role, occurredAt: savedAt },
+                        newId(),
+                      )
+                    : { ...task, effortPoints: task.effortPoints ?? 1 };
                   return {
                     ...board,
-                    tasks: { ...board.tasks, [task.id]: task },
+                    tasks: { ...board.tasks, [task.id]: savedTask },
                     columns: isNew
-                      ? board.columns.map((column) =>
-                          column.id === columnId ? { ...column, taskIds: [...column.taskIds, task.id] } : column,
+                      ? board.columns.map((item) =>
+                          item.id === columnId ? { ...item, taskIds: [...item.taskIds, task.id] } : item,
                         )
                       : board.columns,
-                    updatedAt: now(),
+                    updatedAt: savedAt,
                   };
                 }),
-              }))
-            }
+              }));
+            }}
             onDeleteTask={(columnId, taskId) =>
               commit((current) => ({
                 ...current,
@@ -789,6 +817,13 @@ export default function AkisApp() {
                     ),
                   };
                 }),
+                mindMaps: current.mindMaps.map((map) => ({ ...map, nodes: map.nodes.map((node) => node.linkedTask?.boardId === currentBoard.id && node.linkedTask.taskId === taskId ? { ...node, linkedTask: undefined, linkedTaskId: undefined } : node) })),
+                issues: current.issues.map((issue) => ({
+                  ...issue,
+                  boardId: issue.boardId === currentBoard.id && issue.taskId === taskId ? undefined : issue.boardId,
+                  taskId: issue.boardId === currentBoard.id && issue.taskId === taskId ? undefined : issue.taskId,
+                  actions: issue.actions.map((action) => action.linkedTask?.boardId === currentBoard.id && action.linkedTask.taskId === taskId ? { ...action, linkedTask: undefined } : action),
+                })),
               }))
             }
             onMoveTask={(taskId, fromColumnId, toColumnId, beforeTaskId) =>
@@ -811,13 +846,24 @@ export default function AkisApp() {
                   let tasks = board.tasks;
                   if (fromColumnId !== toColumnId && sourceColumn && targetColumn && board.tasks[taskId]) {
                     const movedAt = now();
+                    const timedTask = transitionTaskTiming(
+                      board.tasks[taskId],
+                      sourceColumn.role,
+                      targetColumn.role,
+                      movedAt,
+                    );
                     tasks = {
                       ...tasks,
-                      [taskId]: transitionTaskTiming(
-                        board.tasks[taskId],
-                        sourceColumn.role,
-                        targetColumn.role,
-                        movedAt,
+                      [taskId]: appendTaskTransition(
+                        timedTask,
+                        {
+                          fromColumnId: sourceColumn.id,
+                          toColumnId: targetColumn.id,
+                          fromRole: sourceColumn.role,
+                          toRole: targetColumn.role,
+                          occurredAt: movedAt,
+                        },
+                        newId(),
                       ),
                     };
                   }
@@ -826,6 +872,12 @@ export default function AkisApp() {
               }))
             }
             onAddLabel={addGlobalLabel}
+            onOpenTaskSource={(task) => {
+              const source = task.sourceLinks?.[0];
+              if (!source) return;
+              if (source.kind === "mindnode" && source.containerId) navigate({ kind: "mindmap", id: source.containerId });
+              else if ((source.kind === "issue" || source.kind === "corrective-action") && source.containerId) navigate({ kind: "issue", id: source.containerId });
+            }}
             onZoomChange={(zoom) =>
               commit(
                 (current) => ({
@@ -845,6 +897,7 @@ export default function AkisApp() {
             key={currentMap.id}
             map={currentMap}
             projectName={data.projects.find((project) => project.id === currentMap.projectId)?.name ?? "Proje"}
+            boards={data.boards.filter((board) => board.projectId === currentMap.projectId && !board.archived)}
             onBack={() => navigate({ kind: "project", id: currentMap.projectId })}
             onRename={(title, description) =>
               commit((current) => ({
@@ -957,6 +1010,43 @@ export default function AkisApp() {
                 false,
               )
             }
+            onCreateTaskFromNode={(nodeId, boardId, columnId) => {
+              const node = currentMap.nodes.find((item) => item.id === nodeId);
+              const board = data.boards.find((item) => item.id === boardId && item.projectId === currentMap.projectId);
+              const column = board?.columns.find((item) => item.id === columnId);
+              if (!node || node.linkedTask || !board || !column) return;
+              const createdAt = now();
+              const taskId = newId();
+              const link: LinkedTaskReference = { boardId, taskId, createdAt };
+              const task = appendTaskTransition({
+                id: taskId,
+                title: node.title,
+                description: node.note,
+                priority: "medium",
+                effortPoints: 1,
+                labelIds: [],
+                assigneeIds: [],
+                sourceLinks: [{ kind: "mindnode", sourceId: node.id, containerId: currentMap.id, createdAt }],
+                createdAt,
+                updatedAt: createdAt,
+              }, { toColumnId: column.id, toRole: column.role, occurredAt: createdAt }, newId());
+              commit((current) => ({
+                ...current,
+                boards: current.boards.map((item) => item.id === boardId ? {
+                  ...item,
+                  tasks: { ...item.tasks, [taskId]: task },
+                  columns: item.columns.map((entry) => entry.id === columnId ? { ...entry, taskIds: [...entry.taskIds, taskId] } : entry),
+                  updatedAt: createdAt,
+                } : item),
+                mindMaps: current.mindMaps.map((map) => map.id === currentMap.id ? {
+                  ...map,
+                  nodes: map.nodes.map((entry) => entry.id === nodeId ? { ...entry, linkedTask: link, linkedTaskId: taskId } : entry),
+                  updatedAt: createdAt,
+                } : map),
+              }));
+              showToast(language === "tr" ? "Fikir Kanban görevine dönüştürüldü" : "Idea converted to a Kanban task", true);
+            }}
+            onOpenLinkedTask={(boardId) => navigate({ kind: "board", id: boardId })}
           />
         )}
 
@@ -1034,7 +1124,9 @@ export default function AkisApp() {
                     const maps = data.mindMaps.filter((item) => item.projectId === id);
                     const tasks = boards.reduce((sum, board) => sum + Object.keys(board.tasks).length, 0);
                     const payments = project?.finance?.payments.length ?? 0;
-                    return `“${project?.name ?? "Proje"}” ile birlikte ${boards.length} Kanban panosu, ${maps.length} zihin haritası, ${tasks} görev ve ${payments} tahsilat kaydı kalıcı olarak silinecek. Bu işlem geri alınamaz. Devam edilsin mi?`;
+                    const issues = data.issues.filter((item) => item.projectId === id).length;
+                    const calendarLinks = data.calendarEvents.filter((item) => item.projectId === id).length;
+                    return `“${project?.name ?? "Proje"}” ile birlikte ${boards.length} Kanban panosu, ${maps.length} zihin haritası, ${tasks} görev, ${issues} sorun analizi ve ${payments} tahsilat kaydı kalıcı olarak silinecek. ${calendarLinks} takvim kaydının proje bağlantısı kaldırılacak. Bu işlem geri alınamaz. Devam edilsin mi?`;
                   })()
                 : "Bu çalışma kalıcı olarak silinecek. Bu işlem geri alınamaz. Devam edilsin mi?";
               if (!window.confirm(message)) return;
@@ -1045,9 +1137,16 @@ export default function AkisApp() {
                     projects: current.projects.filter((item) => item.id !== id),
                     boards: current.boards.filter((item) => item.projectId !== id),
                     mindMaps: current.mindMaps.filter((item) => item.projectId !== id),
+                    issues: current.issues.filter((item) => item.projectId !== id),
+                    calendarEvents: current.calendarEvents.map((item) => item.projectId === id ? { ...item, projectId: undefined } : item),
                   };
                 }
-                if (kind === "board") return { ...current, boards: current.boards.filter((item) => item.id !== id) };
+                if (kind === "board") return {
+                  ...current,
+                  boards: current.boards.filter((item) => item.id !== id),
+                  mindMaps: current.mindMaps.map((map) => ({ ...map, nodes: map.nodes.map((node) => node.linkedTask?.boardId === id ? { ...node, linkedTask: undefined, linkedTaskId: undefined } : node) })),
+                  issues: current.issues.map((issue) => ({ ...issue, boardId: issue.boardId === id ? undefined : issue.boardId, taskId: issue.boardId === id ? undefined : issue.taskId, actions: issue.actions.map((action) => action.linkedTask?.boardId === id ? { ...action, linkedTask: undefined } : action) })),
+                };
                 return { ...current, mindMaps: current.mindMaps.filter((item) => item.id !== id) };
               }, false);
               showToast(language === "tr" ? "Kalıcı olarak silindi" : "Permanently deleted");
@@ -1061,18 +1160,20 @@ export default function AkisApp() {
                 title,
                 description: "",
                 priority: "medium",
+                effortPoints: 1,
                 labelIds: [],
                 assigneeIds: [],
                 createdAt: now(),
                 updatedAt: now(),
               };
+              const capturedTask = appendTaskTransition(task, { toColumnId: column.id, toRole: column.role, occurredAt: task.createdAt }, newId());
               commit((current) => ({
                 ...current,
                 boards: current.boards.map((item) =>
                   item.id === boardId
                     ? {
                         ...item,
-                        tasks: { ...item.tasks, [task.id]: task },
+                        tasks: { ...item.tasks, [task.id]: capturedTask },
                         columns: item.columns.map((entry) =>
                           entry.id === column.id ? { ...entry, taskIds: [task.id, ...entry.taskIds] } : entry,
                         ),
@@ -1081,6 +1182,75 @@ export default function AkisApp() {
                 ),
               }));
               showToast(language === "tr" ? "Görev, toplam görev listesine eklendi" : "Task added to the total task list");
+            }}
+            onSaveCalendarEvent={(event) => commit((current) => ({
+              ...current,
+              calendarEvents: current.calendarEvents.some((item) => item.id === event.id)
+                ? current.calendarEvents.map((item) => item.id === event.id ? { ...event, updatedAt: now() } : item)
+                : [...current.calendarEvents, { ...event, createdAt: event.createdAt || now(), updatedAt: now() }],
+            }))}
+            onDeleteCalendarEvent={(eventId) => {
+              if (!window.confirm(language === "tr" ? "Bu takvim kaydı silinsin mi?" : "Delete this calendar entry?")) return;
+              commit((current) => ({ ...current, calendarEvents: current.calendarEvents.filter((item) => item.id !== eventId) }));
+            }}
+            onCreateIssue={(projectId, title) => {
+              const issue = createProblemIssue(newId(), projectId, title, now());
+              commit((current) => ({ ...current, issues: [...current.issues, issue] }));
+              navigate({ kind: "issue", id: issue.id });
+            }}
+            onSaveIssue={(issue) => {
+              if (issue.status === "closed" && issue.verificationEffective !== true) {
+                showToast(language === "tr" ? "Sorun kapanmadan önce çözümün etkisi doğrulanmalı" : "Verify the solution before closing the problem");
+                return;
+              }
+              commit((current) => ({
+                ...current,
+                issues: current.issues.map((item) => item.id === issue.id ? { ...issue, updatedAt: now() } : item),
+              }));
+              showToast(language === "tr" ? "Sorun analizi kaydedildi" : "Problem analysis saved", true);
+            }}
+            onDeleteIssue={(issueId) => {
+              commit((current) => ({ ...current, issues: current.issues.filter((item) => item.id !== issueId) }));
+              navigate({ kind: "issues" });
+              showToast(language === "tr" ? "Sorun kaydı silindi" : "Problem record deleted", true);
+            }}
+            onCreateCorrectiveTask={(issueDraft, actionId, boardId, columnId) => {
+              const action = issueDraft.actions.find((item) => item.id === actionId);
+              const board = data.boards.find((item) => item.id === boardId && item.projectId === issueDraft.projectId);
+              const column = board?.columns.find((item) => item.id === columnId);
+              if (!action || action.linkedTask || !board || !column) return undefined;
+              const createdAt = now();
+              const taskId = newId();
+              const link: LinkedTaskReference = { boardId, taskId, createdAt };
+              const task = appendTaskTransition({
+                id: taskId,
+                title: action.title,
+                description: action.description,
+                priority: issueDraft.severity === "critical" ? "critical" : issueDraft.severity === "high" ? "high" : "medium",
+                effortPoints: action.effortPoints,
+                labelIds: [],
+                assigneeIds: action.assigneeIds,
+                dueDate: action.dueDate,
+                sourceLinks: [{ kind: "corrective-action", sourceId: action.id, containerId: issueDraft.id, createdAt }],
+                createdAt,
+                updatedAt: createdAt,
+              }, { toColumnId: column.id, toRole: column.role, occurredAt: createdAt }, newId());
+              commit((current) => ({
+                ...current,
+                boards: current.boards.map((item) => item.id === boardId ? {
+                  ...item,
+                  tasks: { ...item.tasks, [taskId]: task },
+                  columns: item.columns.map((entry) => entry.id === columnId ? { ...entry, taskIds: [...entry.taskIds, taskId] } : entry),
+                  updatedAt: createdAt,
+                } : item),
+                issues: current.issues.map((item) => item.id === issueDraft.id ? {
+                  ...issueDraft,
+                  actions: issueDraft.actions.map((entry) => entry.id === actionId ? { ...entry, linkedTask: link, updatedAt: createdAt } : entry),
+                  updatedAt: createdAt,
+                } : item),
+              }));
+              showToast(language === "tr" ? "Düzeltici aksiyon Kanban görevine bağlandı" : "Corrective action linked to a Kanban task", true);
+              return link;
             }}
             onTheme={(theme) => commit((current) => ({ ...current, theme }), false)}
             onLanguage={(nextLanguage) => setWorkspaceStore((current) => current ? setWorkspacePreferences(current, { language: nextLanguage }, now()) : current)}
@@ -1268,6 +1438,8 @@ function Sidebar({
     { kind: "projects" as const, label: t("Projeler"), icon: FolderKanban },
     { kind: "boards" as const, label: t("Kanban Panoları"), icon: LayoutDashboard },
     { kind: "mindmaps" as const, label: t("Zihin Haritaları"), icon: MapIcon },
+    { kind: "calendar" as const, label: language === "tr" ? "Takvim" : "Calendar", icon: CalendarDays },
+    { kind: "issues" as const, label: language === "tr" ? "Sorun Çözme" : "Problem Solving", icon: Wrench },
     { kind: "insights" as const, label: t("İçgörüler"), icon: BarChart3 },
   ];
   return (
@@ -1313,7 +1485,8 @@ function Sidebar({
           const active = screen.kind === item.kind
             || (item.kind === "projects" && screen.kind === "project")
             || (item.kind === "boards" && screen.kind === "board")
-            || (item.kind === "mindmaps" && screen.kind === "mindmap");
+            || (item.kind === "mindmaps" && screen.kind === "mindmap")
+            || (item.kind === "issues" && screen.kind === "issue");
           return (
             <button key={item.kind} className={active ? "active" : ""} aria-label={item.label} aria-current={active ? "page" : undefined} onClick={() => onNavigate({ kind: item.kind })} title={!open ? item.label : undefined}>
               <Icon size={18} /> {open && <span>{item.label}</span>}
@@ -1357,6 +1530,7 @@ function Topbar({
   projects,
   boards,
   mindMaps,
+  issues,
   query,
   searchOpen,
   saveState,
@@ -1375,6 +1549,7 @@ function Topbar({
   projects: Project[];
   boards: KanbanBoard[];
   mindMaps: MindMap[];
+  issues: ProblemIssue[];
   query: string;
   searchOpen: boolean;
   saveState: "saved" | "saving" | "error";
@@ -1394,11 +1569,13 @@ function Topbar({
   const visibleProjectIds = new Set(visibleProjects.map((project) => project.id));
   const visibleBoards = boards.filter((board) => !board.archived && visibleProjectIds.has(board.projectId));
   const visibleMindMaps = mindMaps.filter((map) => !map.archived && visibleProjectIds.has(map.projectId));
+  const visibleIssues = issues.filter((issue) => visibleProjectIds.has(issue.projectId));
   const results = normalized
     ? [
         ...visibleProjects.filter((item) => `${item.name} ${item.clientName ?? ""}`.toLocaleLowerCase(locale).includes(normalized)).map((item) => ({ key: `p-${item.id}`, title: item.name, meta: t("Proje"), screen: { kind: "project", id: item.id } as Screen, icon: FolderKanban })),
         ...visibleBoards.filter((item) => `${item.title} ${item.description}`.toLocaleLowerCase("tr").includes(normalized)).map((item) => ({ key: `b-${item.id}`, title: item.title, meta: "Kanban panosu", screen: { kind: "board", id: item.id } as Screen, icon: LayoutDashboard })),
         ...visibleMindMaps.filter((item) => `${item.title} ${item.description}`.toLocaleLowerCase(locale).includes(normalized)).map((item) => ({ key: `m-${item.id}`, title: item.title, meta: t("Zihin haritası"), screen: { kind: "mindmap", id: item.id } as Screen, icon: MapIcon })),
+        ...visibleIssues.filter((item) => `${item.title} ${item.description} ${item.rootCause}`.toLocaleLowerCase(locale).includes(normalized)).map((item) => ({ key: `i-${item.id}`, title: item.title, meta: language === "tr" ? "Sorun analizi" : "Problem analysis", screen: { kind: "issue", id: item.id } as Screen, icon: Wrench })),
         ...visibleMindMaps.flatMap((map) =>
           map.nodes
             .filter((node) => `${node.title} ${node.note}`.toLocaleLowerCase("tr").includes(normalized))
@@ -1416,7 +1593,8 @@ function Topbar({
     if (screen.kind === "project") return projects.find((item) => item.id === screen.id)?.name;
     if (screen.kind === "board") return boards.find((item) => item.id === screen.id)?.title;
     if (screen.kind === "mindmap") return mindMaps.find((item) => item.id === screen.id)?.title;
-    const names: Record<string, string> = { home: t("Genel Bakış"), projects: t("Projeler"), boards: t("Kanban Panoları"), mindmaps: t("Zihin Haritaları"), insights: t("İçgörüler"), archive: t("Arşiv"), settings: t("Ayarlar") };
+    if (screen.kind === "issue") return issues.find((item) => item.id === screen.id)?.title;
+    const names: Record<string, string> = { home: t("Genel Bakış"), projects: t("Projeler"), boards: t("Kanban Panoları"), mindmaps: t("Zihin Haritaları"), calendar: language === "tr" ? "Takvim" : "Calendar", issues: language === "tr" ? "Sorun Çözme" : "Problem Solving", issue: language === "tr" ? "Sorun Analizi" : "Problem Analysis", insights: t("İçgörüler"), archive: t("Arşiv"), settings: t("Ayarlar") };
     return names[screen.kind];
   })();
 
@@ -1482,6 +1660,12 @@ function ShellContent({
   onRestore,
   onDelete,
   onQuickTask,
+  onSaveCalendarEvent,
+  onDeleteCalendarEvent,
+  onCreateIssue,
+  onSaveIssue,
+  onDeleteIssue,
+  onCreateCorrectiveTask,
   onTheme,
   onLanguage,
   onDefaultCurrency,
@@ -1517,6 +1701,12 @@ function ShellContent({
   onRestore: (kind: "project" | ItemKind, id: string) => void;
   onDelete: (kind: "project" | ItemKind, id: string) => void;
   onQuickTask: (boardId: string, title: string) => void;
+  onSaveCalendarEvent: (event: CalendarEvent) => void;
+  onDeleteCalendarEvent: (id: string) => void;
+  onCreateIssue: (projectId: string, title: string) => void;
+  onSaveIssue: (issue: ProblemIssue) => void;
+  onDeleteIssue: (id: string) => void;
+  onCreateCorrectiveTask: (issue: ProblemIssue, actionId: string, boardId: string, columnId: string) => LinkedTaskReference | undefined;
   onTheme: (theme: ThemeId) => void;
   onLanguage: (language: Language) => void;
   onDefaultCurrency: (currency: CurrencyCode) => void;
@@ -1545,11 +1735,23 @@ function ShellContent({
       />
     );
   }
+  if (screen.kind === "calendar") {
+    return <CalendarScreen data={data} onSave={onSaveCalendarEvent} onDelete={onDeleteCalendarEvent} onNewId={newId} />;
+  }
+  if (screen.kind === "issues") {
+    return <ProblemsScreen data={data} onNavigate={onNavigate} onCreate={onCreateIssue} />;
+  }
+  if (screen.kind === "issue") {
+    const issue = data.issues.find((item) => item.id === screen.id);
+    if (!issue) return <main className="shell-page missing-item-page"><EmptyState title={language === "tr" ? "Sorun kaydı bulunamadı" : "Problem record not found"} description={language === "tr" ? "Kayıt silinmiş veya artık erişilemiyor olabilir." : "The record may have been deleted or is no longer available."} actionLabel={language === "tr" ? "Sorunlara dön" : "Back to problems"} onAction={() => onNavigate({ kind: "issues" })} /></main>;
+    return <IssueDetailScreen issue={issue} data={data} onBack={() => onNavigate({ kind: "issues" })} onSave={onSaveIssue} onDelete={() => onDeleteIssue(issue.id)} onCreateTask={onCreateCorrectiveTask} onOpenTask={(boardId) => onNavigate({ kind: "board", id: boardId })} onNewId={newId} />;
+  }
   if (screen.kind === "project") {
     const project = data.projects.find((item) => item.id === screen.id);
     if (!project) return <main className="shell-page missing-item-page"><EmptyState title={t("Proje bulunamadı")} description={t("Bu proje kaldırılmış veya arşivlenmiş olabilir.")} actionLabel={t("Projelere dön")} onAction={() => onNavigate({ kind: "projects" })} /></main>;
     return (
       <ProjectScreen
+        data={data}
         project={project}
         boards={data.boards.filter((board) => board.projectId === project.id && !board.archived)}
         mindMaps={data.mindMaps.filter((map) => map.projectId === project.id && !map.archived)}
@@ -1563,6 +1765,7 @@ function ShellContent({
         onDeletePayment={(paymentId) => onDeletePayment(project.id, paymentId)}
         onDuplicate={(kind, id) => onModal({ type: "duplicate", kind, id })}
         onArchiveItem={onArchiveItem}
+        onBack={() => onNavigate({ kind: "projects" })}
       />
     );
   }
@@ -1615,19 +1818,15 @@ function ShellContent({
         actionLabel={t(isBoard ? "Yeni Kanban panosu" : "Yeni zihin haritası")}
         onAction={() => onModal({ type: "item", kind: isBoard ? "board" : "mindmap" })}
       >
-        <div className="asset-grid">
-          {items.map((item) => (
-            <AssetCard
-              key={item.id}
-              item={item}
-              project={data.projects.find((project) => project.id === item.projectId)}
-              onOpen={() => onNavigate({ kind: item.kind, id: item.id })}
-              onDuplicate={() => onModal({ type: "duplicate", kind: item.kind, id: item.id })}
-              onArchive={() => onArchiveItem(item.kind, item.id)}
-            />
-          ))}
-          {items.length === 0 && <EmptyState title={t(isBoard ? "Henüz Kanban panosu yok" : "Henüz zihin haritası yok")} description={t(isBoard ? "Bir proje oluşturup ilk görev akışınızı kurabilirsiniz." : "Bir proje oluşturup düşüncelerinizi dallandırmaya başlayabilirsiniz.")} />}
-        </div>
+        <GroupedAssetLibrary
+          items={items}
+          projects={data.projects.filter((project) => !project.archived)}
+          onNavigate={onNavigate}
+          onDuplicate={(item) => onModal({ type: "duplicate", kind: item.kind, id: item.id })}
+          onArchive={(item) => onArchiveItem(item.kind, item.id)}
+          emptyTitle={t(isBoard ? "Henüz Kanban panosu yok" : "Henüz zihin haritası yok")}
+          emptyDescription={t(isBoard ? "Bir proje oluşturup ilk görev akışınızı kurabilirsiniz." : "Bir proje oluşturup düşüncelerinizi dallandırmaya başlayabilirsiniz.")}
+        />
       </LibraryScreen>
     );
   }
@@ -1867,6 +2066,7 @@ function FinanceMetricCard({ tone, label, values, note }: { tone: string; label:
 }
 
 function ProjectScreen({
+  data,
   project,
   boards,
   mindMaps,
@@ -1880,7 +2080,9 @@ function ProjectScreen({
   onDeletePayment,
   onDuplicate,
   onArchiveItem,
+  onBack,
 }: {
+  data: AppData;
   project: Project;
   boards: KanbanBoard[];
   mindMaps: MindMap[];
@@ -1894,6 +2096,7 @@ function ProjectScreen({
   onDeletePayment: (paymentId: string) => void;
   onDuplicate: (kind: ItemKind, id: string) => void;
   onArchiveItem: (kind: ItemKind, id: string) => void;
+  onBack: () => void;
 }) {
   const { t, language, locale } = useI18n();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -1916,8 +2119,10 @@ function ProjectScreen({
   const sortedPayments = [...(project.finance?.payments ?? [])].sort((a, b) =>
     b.receivedOn.localeCompare(a.receivedOn),
   );
+  const projectIssues = data.issues.filter((issue) => issue.projectId === project.id);
   return (
     <main className="shell-page project-page">
+      <button className="project-back-button" onClick={onBack}><ArrowLeft size={16} /> {language === "tr" ? "Projelere dön" : "Back to projects"}</button>
       <section className="project-hero" style={{ "--project-color": project.color } as React.CSSProperties}>
         <div className="project-symbol"><FolderKanban size={25} /></div>
         <div className="project-hero-copy">
@@ -1935,7 +2140,10 @@ function ProjectScreen({
         <span><LayoutDashboard size={16} /><strong>{boards.length}</strong> {language === "tr" ? "Kanban panosu" : "Kanban boards"}</span>
         <span><MapIcon size={16} /><strong>{mindMaps.length}</strong> {language === "tr" ? "zihin haritası" : "mind maps"}</span>
         <span><ListTodo size={16} /><strong>{boards.reduce((sum, board) => sum + Object.keys(board.tasks).length, 0)}</strong> {language === "tr" ? "toplam görev" : "total tasks"}</span>
+        <button onClick={() => onNavigate({ kind: "issues" })}><CircleAlert size={16} /><strong>{projectIssues.filter((issue) => issue.status !== "closed").length}</strong> {language === "tr" ? "açık sorun" : "open problems"}</button>
       </section>
+
+      <BurnupChart data={data} project={project} />
 
       <section className="project-overview-grid">
         <article className="project-command-card lifecycle-card">
@@ -2068,6 +2276,23 @@ function AssetCard({
 function CreateCard({ icon: Icon, label, onClick }: { icon: typeof Home; label: string; onClick: () => void }) {
   const { t } = useI18n();
   return <button className="create-card" onClick={onClick}><span><Icon size={21} /></span><strong>{label}</strong><small>{t("Boş bir çalışma yüzeyiyle başlayın")}</small></button>;
+}
+
+function GroupedAssetLibrary({ items, projects, onNavigate, onDuplicate, onArchive, emptyTitle, emptyDescription }: { items: Array<KanbanBoard | MindMap>; projects: Project[]; onNavigate: (screen: Screen) => void; onDuplicate: (item: KanbanBoard | MindMap) => void; onArchive: (item: KanbanBoard | MindMap) => void; emptyTitle: string; emptyDescription: string }) {
+  const { language } = useI18n();
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const groups = projects.map((project) => ({ project, items: items.filter((item) => item.projectId === project.id) })).filter((group) => group.items.length > 0);
+  if (groups.length === 0) return <EmptyState title={emptyTitle} description={emptyDescription} />;
+  return <div className="project-asset-groups">{groups.map(({ project, items: projectItems }) => {
+    const isCollapsed = collapsed[project.id] === true;
+    return <section key={project.id} className="project-asset-group" style={{ "--project-color": project.color } as React.CSSProperties}>
+      <header className="project-asset-group-header">
+        <button className="group-collapse" onClick={() => setCollapsed((current) => ({ ...current, [project.id]: !isCollapsed }))} aria-expanded={!isCollapsed}><ChevronDown size={18} /><span className="project-group-mark" /><strong>{project.name}</strong><span className="count-badge">{projectItems.length}</span></button>
+        <button className="text-button" onClick={() => onNavigate({ kind: "project", id: project.id })}>{language === "tr" ? "Projeyi aç" : "Open project"} <ArrowRight size={15} /></button>
+      </header>
+      {!isCollapsed && <div className="asset-grid">{projectItems.map((item) => <AssetCard key={item.id} item={item} project={project} onOpen={() => onNavigate({ kind: item.kind, id: item.id })} onDuplicate={() => onDuplicate(item)} onArchive={() => onArchive(item)} />)}</div>}
+    </section>;
+  })}</div>;
 }
 
 function LibraryScreen({ title, description, actionLabel, onAction, children }: { title: string; description: string; actionLabel: string; onAction: () => void; children: React.ReactNode }) {

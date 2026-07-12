@@ -13,6 +13,7 @@ const {
   updateActiveWorkspaceData,
 } = await import(new URL("../app/workspaceManagement.ts", import.meta.url));
 const { normalizeWorkspaceStore } = await import(new URL("../app/storage.ts", import.meta.url));
+const { createProblemIssue } = await import(new URL("../app/v4Workflows.ts", import.meta.url));
 
 function legacyData() {
   return {
@@ -34,17 +35,21 @@ test("v1 data migrates losslessly into the named personal workspace", () => {
   const store = normalizeWorkspaceStore(legacy);
 
   assert.ok(store);
-  assert.equal(store.version, 3);
+  assert.equal(store.version, 4);
   assert.deepEqual(store.preferences, { defaultCurrency: "TRY", freshInstallation: false });
   assert.equal(store.workspaces.length, 1);
   assert.equal(store.workspaces[0].name, "Kişisel Alanım");
   assert.equal(store.workspaces[0].data.workspaceName, "Kişisel Alanım");
   assert.equal(store.workspaces[0].data.projects[0].finance.agreedAmountKurus, 250000);
   assert.equal(store.workspaces[0].data.boards[0].tasks["task-1"].title, "Özel görev");
+  assert.equal(store.workspaces[0].data.version, 2);
+  assert.equal(store.workspaces[0].data.boards[0].tasks["task-1"].effortPoints, 1);
+  assert.deepEqual(store.workspaces[0].data.issues, []);
+  assert.deepEqual(store.workspaces[0].data.calendarEvents, []);
   assert.equal(legacy.workspaceName, "Eski Alan");
 });
 
-test("v2 workspace stores migrate to v3 without changing workspace content", () => {
+test("v2 workspace stores migrate to v4 without changing workspace content", () => {
   const stamp = "2026-04-01T00:00:00.000Z";
   const v3 = createWorkspaceStoreFromLegacy(legacyData(), "personal", stamp);
   const v2 = structuredClone(v3);
@@ -52,7 +57,7 @@ test("v2 workspace stores migrate to v3 without changing workspace content", () 
   v2.version = 2;
   const migrated = normalizeWorkspaceStore(v2);
   assert.ok(migrated);
-  assert.equal(migrated.version, 3);
+  assert.equal(migrated.version, 4);
   assert.equal(migrated.preferences.defaultCurrency, "TRY");
   assert.equal(migrated.preferences.language, undefined);
   assert.equal(migrated.workspaces[0].data.projects[0].name, "Özel Proje");
@@ -93,4 +98,24 @@ test("workspaces can be named, archived, restored, and only archived ones delete
   store = deleteArchivedWorkspace(store, "work", stamp);
   assert.deepEqual(store.workspaces.map((item) => item.id), ["personal"]);
   assert.equal(archiveWorkspace(store, "personal", stamp), store);
+});
+
+test("migration removes broken task links without deleting analysis or ideas", () => {
+  const stamp = "2026-07-12T12:00:00.000Z";
+  const store = createWorkspaceStoreFromLegacy(legacyData(), "personal", stamp);
+  const data = store.workspaces[0].data;
+  const issue = createProblemIssue("issue-1", "project-1", "Bağlantı testi", stamp);
+  issue.boardId = "board-1";
+  issue.taskId = "missing-task";
+  issue.actions = [{ id: "action-1", title: "Aksiyon", description: "", assigneeIds: [], effortPoints: 1, linkedTask: { boardId: "board-1", taskId: "missing-task", createdAt: stamp }, createdAt: stamp, updatedAt: stamp }];
+  data.issues = [issue];
+  data.mindMaps = [{ id: "map-1", kind: "mindmap", projectId: "project-1", title: "Harita", description: "", archived: false, createdAt: stamp, updatedAt: stamp, nodes: [{ id: "node-1", title: "Fikir", note: "", x: 0, y: 0, color: "violet", linkedTask: { boardId: "board-1", taskId: "missing-task", createdAt: stamp } }] }];
+
+  const migrated = normalizeWorkspaceStore(store);
+  assert.ok(migrated);
+  assert.equal(migrated.workspaces[0].data.issues[0].title, "Bağlantı testi");
+  assert.equal(migrated.workspaces[0].data.issues[0].taskId, undefined);
+  assert.equal(migrated.workspaces[0].data.issues[0].actions[0].linkedTask, undefined);
+  assert.equal(migrated.workspaces[0].data.mindMaps[0].nodes[0].linkedTask, undefined);
+  assert.equal(migrated.workspaces[0].data.mindMaps[0].nodes[0].title, "Fikir");
 });

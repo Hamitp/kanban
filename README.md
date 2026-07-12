@@ -35,9 +35,14 @@ Değişiklik olduğunda saatlik güvenlik kopyaları `Belgeler\Akış\Save\Backu
 - Kişisel ve iş projelerini birbirinden ayıran, adı ve rengi değiştirilebilen bağımsız çalışma alanları
 - Biten çalışma alanlarını arşivleme, geri getirme ve yalnızca arşivden kalıcı olarak silme
 - Proje başına birden fazla özelleştirilebilir Kanban panosu ve zihin haritası
+- Kanban ve zihin haritası kütüphanelerinde projeye göre gruplanmış, daraltılabilir çalışma alanları
 - Boş alanda sol tuşla veya orta tuşla gezinen; `Ctrl + fare tekerleği` ile yakınlaşan çalışma alanları
 - Sürükle-bırak, görünür bırakma hedefleri, kenarda otomatik kaydırma ve klavyeyle görev taşıma
 - Etiketler, bekleme/engel nedeni, öncelik, son tarih ve birden fazla kişi ataması
+- 1, 2, 3, 5 ve 8 puanlık iş yükü tahmini; görev hareket geçmişinden üretilen görev/puan bazlı burn-up grafiği
+- Zihin haritasındaki bir fikri hedef pano ve sütunu seçerek çift yönlü bağlantılı Kanban görevine dönüştürme
+- Proje ve göreve bağlanabilen sorun kayıtları; 5 Neden, balık kılçığı, A3, düzeltici aksiyon, etki doğrulaması ve öğrenilen dersler
+- Toplantı, planlı iş ve not eklenebilen sade aylık takvim; görev son tarihlerinin otomatik görünümü
 - Görevin aktif çalışma süresi ve tamamlanma süresi geçmişi
 - Aktif, tamamlandı ve müşteriye teslim edildi proje aşamaları
 - Anlaşılan tutar, kısmi/tam tahsilat, bekleyen alacak ve tahsilat geçmişi
@@ -106,6 +111,11 @@ When data changes, hourly safety copies are created under `Documents\Akış\Save
 
 - Separate, named workspaces for personal and shared-screen contexts
 - Custom Kanban columns, drag and drop, keyboard moving, labels, blockers, due dates, and multiple assignees
+- Project-grouped Kanban and mind map libraries with collapsible sections
+- 1, 2, 3, 5 and 8-point effort estimates plus task/effort burn-up charts based on movement history
+- Two-way conversion from a mind-map idea to a selected Kanban board and column
+- Project/task-linked problem records with 5 Whys, fishbone, A3, corrective tasks, effectiveness verification, and lessons learned
+- A simple monthly calendar for meetings, planned work, notes, and automatically derived task due dates
 - Elegant mind maps with collapsible details, auto layout, panning, and zoom
 - Task active-time and completion-time history
 - Active, completed, and delivered project stages

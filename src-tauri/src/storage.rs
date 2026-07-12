@@ -185,12 +185,15 @@ fn validate_app_data(data: &Value) -> bool {
         return false;
     };
 
-    object.get("version").and_then(Value::as_u64) == Some(1)
+    matches!(object.get("version").and_then(Value::as_u64), Some(1 | 2))
         && object.get("projects").is_some_and(Value::is_array)
         && object.get("boards").is_some_and(Value::is_array)
         && object.get("mindMaps").is_some_and(Value::is_array)
         && object.get("members").is_some_and(Value::is_array)
         && object.get("labels").is_some_and(Value::is_array)
+        && (object.get("version").and_then(Value::as_u64) == Some(1)
+            || (object.get("issues").is_some_and(Value::is_array)
+                && object.get("calendarEvents").is_some_and(Value::is_array)))
 }
 
 fn validate_workspace(data: &Value) -> bool {
@@ -203,10 +206,10 @@ fn validate_workspace(data: &Value) -> bool {
         return false;
     };
     let version = object.get("version").and_then(Value::as_u64);
-    if version != Some(2) && version != Some(3) {
+    if version != Some(2) && version != Some(3) && version != Some(4) {
         return false;
     }
-    if version == Some(3) {
+    if version == Some(3) || version == Some(4) {
         let Some(preferences) = object.get("preferences").and_then(Value::as_object) else {
             return false;
         };
@@ -870,9 +873,18 @@ mod tests {
         })
     }
 
+    fn workspace_v2(name: &str) -> Value {
+        let mut data = workspace(name);
+        let object = data.as_object_mut().expect("app data object");
+        object.insert("version".into(), json!(2));
+        object.insert("issues".into(), json!([]));
+        object.insert("calendarEvents".into(), json!([]));
+        data
+    }
+
     fn workspace_store(name: &str) -> Value {
         json!({
-            "version": 3,
+            "version": 4,
             "activeWorkspaceId": "workspace-personal",
             "workspaces": [{
                 "id": "workspace-personal",
@@ -881,7 +893,7 @@ mod tests {
                 "archived": false,
                 "createdAt": "2026-07-12T12:00:00.000Z",
                 "updatedAt": "2026-07-12T12:00:00.000Z",
-                "data": workspace(name)
+                "data": workspace_v2(name)
             }],
             "preferences": {
                 "language": "en",
@@ -951,14 +963,14 @@ mod tests {
     }
 
     #[test]
-    fn accepts_and_round_trips_the_v3_workspace_store() {
+    fn accepts_and_round_trips_the_v4_workspace_store() {
         let root = tempdir().expect("temp dir");
         let paths = StoragePaths::under_documents(root.path());
         let runtime = StorageRuntime::default();
         let expected = workspace_store("Kişisel Alanım");
 
-        write_workspace_at(&paths, &runtime, expected.clone()).expect("v3 save");
-        let loaded = load_workspace_at(&paths, &runtime).expect("v3 load");
+        write_workspace_at(&paths, &runtime, expected.clone()).expect("v4 save");
+        let loaded = load_workspace_at(&paths, &runtime).expect("v4 load");
 
         assert_eq!(loaded.data, Some(expected));
         assert_eq!(loaded.recovery.status, "none");
@@ -974,7 +986,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_unknown_v3_currency_preferences() {
+    fn rejects_unknown_workspace_currency_preferences() {
         let mut invalid = workspace_store("Kişisel Alanım");
         invalid["preferences"]["defaultCurrency"] = json!("JPY");
         assert!(!validate_workspace(&invalid));

@@ -1,12 +1,13 @@
 "use client";
 
-import { AlertTriangle, BarChart3, Clock3, Gauge, Sparkles, TrendingUp, Users, WalletCards } from "lucide-react";
+import { AlertTriangle, BarChart3, Clock3, Gauge, Sparkles, TrendingUp, Users, WalletCards, Wrench } from "lucide-react";
 import { useState } from "react";
 import { useI18n } from "../i18n";
 import { formatCompactMoney, formatMoney, getPortfolioCurrencies } from "../projectFinance";
 import { getTaskWorkMs } from "../taskTiming";
 import type { AppData, CurrencyCode, Screen } from "../types";
 import { getWorkspaceInsights } from "../workspaceAnalytics";
+import { getIssueInsights } from "../v4Workflows";
 
 export function InsightsScreen({ data, onNavigate }: { data: AppData; onNavigate: (screen: Screen) => void }) {
   const { language } = useI18n();
@@ -22,6 +23,7 @@ export function InsightsScreen({ data, onNavigate }: { data: AppData; onNavigate
   const completedLastFourWeeks = insights.weeklyThroughput.slice(-4).reduce((sum, item) => sum + item.count, 0);
   const priorFourWeeks = insights.weeklyThroughput.slice(0, 4).reduce((sum, item) => sum + item.count, 0);
   const throughputDelta = completedLastFourWeeks - priorFourWeeks;
+  const issueInsights = getIssueInsights(data.issues);
 
   return (
     <main className="shell-page insights-page">
@@ -53,6 +55,8 @@ export function InsightsScreen({ data, onNavigate }: { data: AppData; onNavigate
         </article>
 
         <article className="insight-card workload-card"><header><div><span className="eyebrow">{language === "tr" ? "KAPASİTE" : "CAPACITY"}</span><h2>{language === "tr" ? "Kişi bazlı görev yükü" : "Workload by person"}</h2></div><Users size={19} /></header>{insights.memberWorkload.some((item) => item.count) ? <div className="horizontal-bars">{insights.memberWorkload.map(({ member, count }) => <div className="horizontal-bar" key={member.id}><span className="member-avatar" style={{ background: member.color }}>{member.initials}</span><strong>{member.name}</strong><div><i style={{ width: `${(count / maxWorkload) * 100}%` }} /></div><span>{count}</span></div>)}</div> : <InsightEmpty text={language === "tr" ? "Öncelikli veya aktif görevler kişilere atandığında yük dağılımı görünür." : "Workload distribution appears when prioritized or active tasks are assigned."} />}</article>
+
+        <article className="insight-card issue-insight-card"><header><div><span className="eyebrow">{language === "tr" ? "SORUN ÖĞRENİMİ" : "PROBLEM LEARNING"}</span><h2>{language === "tr" ? "Kök neden ve çözüm görünümü" : "Root cause and resolution view"}</h2></div><Wrench size={19} /></header>{data.issues.length ? <><div className="issue-insight-metrics"><span><small>{language === "tr" ? "Açık" : "Open"}</small><strong>{issueInsights.open}</strong></span><span><small>{language === "tr" ? "Doğrulamada" : "Verifying"}</small><strong>{issueInsights.verifying}</strong></span><span><small>{language === "tr" ? "Ort. çözüm" : "Avg. resolution"}</small><strong>{issueInsights.averageResolutionDays ? `${issueInsights.averageResolutionDays} ${language === "tr" ? "gün" : "days"}` : "—"}</strong></span></div><div className="root-cause-list">{issueInsights.rootCauses.slice(0, 4).map(([cause, count]) => <div key={cause}><span>{cause}</span><strong>{count}</strong></div>)}{issueInsights.rootCauses.length === 0 && <small>{language === "tr" ? "Kök nedenler doğrulandıkça tekrar eden örüntüler burada görünür." : "Recurring patterns appear as root causes are validated."}</small>}</div><button className="text-button" onClick={() => onNavigate({ kind: "issues" })}>{language === "tr" ? "Sorun çözme araçlarını aç" : "Open problem-solving tools"}</button></> : <InsightEmpty text={language === "tr" ? "İlk sorun kaydıyla kök neden örüntülerini izlemeye başlayın." : "Create the first problem record to begin tracking root cause patterns."} />}</article>
       </section>
 
       <section className="insight-card risk-card"><header><div><span className="eyebrow">{language === "tr" ? "ODAK ÖNERİLERİ" : "FOCUS SUGGESTIONS"}</span><h2>{language === "tr" ? "Şimdi neye bakmalısınız?" : "What should you look at now?"}</h2></div><Sparkles size={19} /></header>{insights.risks.length ? <div className="risk-list">{insights.risks.slice(0, 6).map(({ task, board, role }) => { const activeDays = role === "active" ? Math.floor(getTaskWorkMs(task) / 86_400_000) : 0; const reason = task.waitingReason ? task.waitingReason : task.dueDate && new Date(`${task.dueDate}T23:59:59`).getTime() < referenceTime ? language === "tr" ? "Son tarihi geçti" : "Overdue" : language === "tr" ? `${activeDays} gündür aktif` : `Active for ${activeDays} days`; return <button key={task.id} onClick={() => onNavigate({ kind: "board", id: board.id })}><span className="risk-marker"><AlertTriangle size={15} /></span><span><strong>{task.title}</strong><small>{board.title} · {reason}</small></span><span className="risk-action">{language === "tr" ? "Boarda git" : "Open board"}</span></button>; })}</div> : <div className="healthy-insight"><Clock3 size={21} /><div><strong>{language === "tr" ? "Akışınız sakin görünüyor" : "Your flow looks calm"}</strong><span>{language === "tr" ? "Bekleyen, beş günden uzun süren veya son tarihi geçen açık görev yok." : "There are no waiting, overdue or open tasks running longer than five days."}</span></div></div>}</section>
