@@ -18,6 +18,7 @@ import {
   Home,
   LayoutDashboard,
   Leaf,
+  ListChecks,
   ListTodo,
   Map as MapIcon,
   Moon,
@@ -1699,6 +1700,8 @@ function HomeScreen({
       .map((task) => ({ task, board })),
   );
   const totalDone = projectStats.reduce((sum, item) => sum + item.stats.done, 0);
+  const totalPrioritized = projectStats.reduce((sum, item) => sum + item.stats.planned, 0);
+  const totalRemaining = totalPrioritized + activeTasks.length;
   const totalCommitted = projectStats.reduce((sum, item) => sum + item.stats.committed, 0);
   const averageProgress = totalCommitted ? Math.round((totalDone / totalCommitted) * 100) : 0;
   const cycleSamples = activeBoards.flatMap((board) => Object.values(board.tasks).filter((task) => task.completedAt && task.workSessions?.length));
@@ -1730,6 +1733,7 @@ function HomeScreen({
 
       <section className="metric-grid" aria-label={language === "tr" ? "Çalışma alanı özeti" : "Workspace summary"}>
         <MetricCard icon={FolderKanban} tone="violet" label={language === "tr" ? "Aktif proje" : "Active projects"} value={workInProgressProjects.length} note={`${activeBoards.length} ${language === "tr" ? "Kanban panosu" : activeBoards.length === 1 ? "Kanban board" : "Kanban boards"}`} />
+        <MetricCard icon={ListChecks} tone="blue" label={language === "tr" ? "Önceliklendirilmiş" : "Prioritized"} value={totalPrioritized} note={language === "tr" ? `Aktiflerle birlikte ${totalRemaining} iş kaldı` : `${totalRemaining} tasks remaining with active work`} />
         <MetricCard icon={ListTodo} tone="blue" label={language === "tr" ? "Üzerinde çalışılan" : "In progress"} value={activeTasks.length} note={`${waitingTasks.length} ${language === "tr" ? "görev beklemede" : waitingTasks.length === 1 ? "task waiting" : "tasks waiting"}`} />
         <MetricCard icon={CheckCircle2} tone="green" label={language === "tr" ? "Tamamlanan" : "Completed"} value={totalDone} note={language === "tr" ? `Genel ilerleme %${averageProgress}` : `Overall progress ${averageProgress}%`} />
         <MetricCard icon={RotateCcw} tone="amber" label={language === "tr" ? "Ortalama çevrim" : "Average cycle"} value={averageCycle ? `${averageCycle} ${language === "tr" ? "gün" : "days"}` : "—"} note={language === "tr" ? `${cycleSamples.length} tamamlanan görevden` : `From ${cycleSamples.length} completed tasks`} />
