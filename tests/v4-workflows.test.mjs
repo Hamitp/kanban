@@ -50,6 +50,20 @@ test("burn-up excludes backlog and supports task and effort views", () => {
   assert.deepEqual({ total: pointView.total, completed: pointView.completed, remaining: pointView.remaining }, { total: 8, completed: 5, remaining: 3 });
 });
 
+test("burn-up supports short 7, 15 and 21 day decision windows", () => {
+  const data = workspaceWithTasks();
+  const today = new Date("2026-07-10T12:00:00.000Z");
+  const sevenDays = getProjectBurnup(data, "p1", { today, days: 7 });
+  const fifteenDays = getProjectBurnup(data, "p1", { today, days: 15 });
+  const twentyOneDays = getProjectBurnup(data, "p1", { today, days: 21 });
+
+  assert.equal(sevenDays.points.length, 7);
+  assert.equal(sevenDays.points[0].date, "2026-07-04");
+  assert.equal(sevenDays.points.at(-1).date, "2026-07-10");
+  assert.equal(fifteenDays.points.length, 15);
+  assert.equal(twentyOneDays.points.length, 21);
+});
+
 test("a problem cannot close before effectiveness verification", () => {
   const issue = createProblemIssue("i1", "p1", "Tekrarlayan hata", stamp);
   assert.equal(transitionIssueStatus(issue, "closed", stamp), null);

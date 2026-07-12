@@ -15,6 +15,7 @@ import type {
 
 export const effortPointOptions: EffortPoints[] = [1, 2, 3, 5, 8];
 export const committedRoles = new Set<FlowRole>(["planned", "active", "done"]);
+export type BurnupRangeDays = 7 | 15 | 21 | 30 | 90;
 
 export function taskEffort(task: TaskCard): EffortPoints {
   return effortPointOptions.includes(task.effortPoints as EffortPoints)
@@ -140,7 +141,7 @@ function dateKey(date: Date): string {
 export function getProjectBurnup(
   data: AppData,
   projectId: string,
-  options: { days?: 30 | 90; mode?: "tasks" | "points"; today?: Date; language?: Language } = {},
+  options: { days?: BurnupRangeDays; mode?: "tasks" | "points"; today?: Date; language?: Language } = {},
 ) {
   const today = options.today ?? new Date();
   const mode = options.mode ?? "tasks";
