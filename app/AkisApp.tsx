@@ -76,6 +76,7 @@ import {
 import { currencyName, I18nProvider, languageName, useI18n } from "./i18n";
 import { createBoard, createMindMap, createSeedData, newId } from "./seed";
 import { countMemberAssignments, removeMemberFromWorkspace } from "./memberManagement";
+import { countLabelUsage, removeLabelFromWorkspace } from "./labelManagement";
 import {
   archiveWorkspace,
   createBlankWorkspace,
@@ -654,6 +655,36 @@ export default function AkisApp() {
     return id;
   }
 
+  function deleteGlobalLabel(labelId: string) {
+    if (!data) return false;
+    const label = data.labels.find((item) => item.id === labelId);
+    if (!label) return false;
+
+    const usageCount = countLabelUsage(data, labelId);
+    const usageNotice = usageCount > 0
+      ? language === "tr"
+        ? `\n\nBu etiket ${usageCount} görevden de kaldırılacak. Görevler silinmeyecek.`
+        : `\n\nThis label will also be removed from ${usageCount} ${usageCount === 1 ? "task" : "tasks"}. The tasks will not be deleted.`
+      : "";
+    const question = language === "tr"
+      ? `“${label.name}” etiketi kalıcı olarak silinsin mi?${usageNotice}`
+      : `Permanently delete the “${label.name}” label?${usageNotice}`;
+    if (!window.confirm(question)) return false;
+
+    commit((current) => removeLabelFromWorkspace(current, labelId, now()));
+    showToast(
+      language === "tr"
+        ? usageCount > 0
+          ? `${label.name} etiketi silindi; ${usageCount} görevden kaldırıldı`
+          : `${label.name} etiketi silindi`
+        : usageCount > 0
+          ? `${label.name} was deleted and removed from ${usageCount} ${usageCount === 1 ? "task" : "tasks"}`
+          : `${label.name} was deleted`,
+      true,
+    );
+    return true;
+  }
+
   const shellScreen = !(currentBoard || currentMap);
 
   return (
@@ -882,6 +913,7 @@ export default function AkisApp() {
               }))
             }
             onAddLabel={addGlobalLabel}
+            onDeleteLabel={deleteGlobalLabel}
             onOpenTaskSource={(task) => {
               const source = task.sourceLinks?.[0];
               if (!source) return;

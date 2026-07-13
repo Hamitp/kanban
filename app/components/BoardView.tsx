@@ -65,6 +65,7 @@ interface BoardViewProps {
     beforeTaskId?: string,
   ) => void;
   onAddLabel: (name: string, color: string) => string;
+  onDeleteLabel: (labelId: string) => boolean;
   onZoomChange: (zoom: number) => void;
   onOpenTaskSource: (task: TaskCard) => void;
 }
@@ -101,6 +102,7 @@ export function BoardView({
   onOpenTaskSource,
   onMoveTask,
   onAddLabel,
+  onDeleteLabel,
   onZoomChange,
 }: BoardViewProps) {
   const { language } = useI18n();
@@ -441,6 +443,7 @@ export function BoardView({
           labels={labels}
           onClose={() => setSelected(null)}
           onAddLabel={onAddLabel}
+          onDeleteLabel={onDeleteLabel}
           onSave={(task, targetColumnId, placement) => {
             onSaveTask(selected.isNew ? targetColumnId : selected.columnId, task, selected.isNew);
             const requestedMove = placement
@@ -635,6 +638,7 @@ function TaskPanel({
   onSave,
   onDelete,
   onAddLabel,
+  onDeleteLabel,
   onOpenSource,
 }: {
   task: TaskCard;
@@ -647,6 +651,7 @@ function TaskPanel({
   onSave: (task: TaskCard, targetColumnId: string, placement?: TaskPlacement) => void;
   onDelete: () => void;
   onAddLabel: (name: string, color: string) => string;
+  onDeleteLabel: (labelId: string) => boolean;
   onOpenSource: () => void;
 }) {
   const { language } = useI18n();
@@ -694,6 +699,14 @@ function TaskPanel({
       nextColumnId,
       placement,
     );
+  }
+
+  function deleteLabel(labelId: string) {
+    if (!onDeleteLabel(labelId)) return;
+    setDraft((current) => ({
+      ...current,
+      labelIds: current.labelIds.filter((id) => id !== labelId),
+    }));
   }
 
   return (
@@ -798,16 +811,39 @@ function TaskPanel({
             </legend>
             <div className="choice-grid">
               {labels.map((label) => (
-                <label className="choice-pill" key={label.id}>
-                  <input
-                    type="checkbox"
-                    checked={draft.labelIds.includes(label.id)}
-                    onChange={() => toggle("labelIds", label.id)}
-                  />
-                  <i style={{ background: label.color }} /> {label.name}
-                </label>
+                <div className="label-choice-item" key={label.id}>
+                  <label className="choice-pill">
+                    <input
+                      type="checkbox"
+                      checked={draft.labelIds.includes(label.id)}
+                      onChange={() => toggle("labelIds", label.id)}
+                    />
+                    <i style={{ background: label.color }} /> {label.name}
+                  </label>
+                  <button
+                    type="button"
+                    className="label-delete-button"
+                    onClick={() => deleteLabel(label.id)}
+                    aria-label={tr ? `${label.name} etiketini sil` : `Delete ${label.name} label`}
+                    title={tr ? "Etiketi sil" : "Delete label"}
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
               ))}
-              {pendingLabels.map((label) => <span className="choice-pill pending" key={label}><i style={{ background: "#7771c9" }} />{label} · {tr ? "yeni" : "new"}</span>)}
+              {pendingLabels.map((label) => (
+                <span className="choice-pill pending" key={label}>
+                  <i style={{ background: "#7771c9" }} />{label} · {tr ? "yeni" : "new"}
+                  <button
+                    type="button"
+                    onClick={() => setPendingLabels((current) => current.filter((item) => item !== label))}
+                    aria-label={tr ? `${label} yeni etiketini kaldır` : `Remove new ${label} label`}
+                    title={tr ? "Yeni etiketi kaldır" : "Remove new label"}
+                  >
+                    <X size={12} />
+                  </button>
+                </span>
+              ))}
             </div>
             <div className="inline-create">
               <input

@@ -38,7 +38,7 @@ Değişiklik olduğunda saatlik güvenlik kopyaları `Belgeler\Akış\Save\Backu
 - Kanban ve zihin haritası kütüphanelerinde projeye göre gruplanmış, daraltılabilir çalışma alanları
 - Boş alanda sol tuşla veya orta tuşla gezinen; `Ctrl + fare tekerleği` ile yakınlaşan çalışma alanları
 - Sürükle-bırak, görünür bırakma hedefleri, kenarda otomatik kaydırma ve klavyeyle görev taşıma
-- Etiketler, bekleme/engel nedeni, öncelik, son tarih ve birden fazla kişi ataması
+- Güvenli biçimde eklenip silinebilen etiketler; bekleme/engel nedeni, öncelik, son tarih ve birden fazla kişi ataması
 - 1, 2, 3, 5, 8 ve 13 puanlık iş yükü tahmini; küçük, orta/zor ve çok zor işler için görünür puanlama rehberi; görev hareket geçmişinden üretilen görev/puan bazlı burn-up grafiği
 - Zihin haritasındaki bir fikri hedef pano ve sütunu seçerek çift yönlü bağlantılı Kanban görevine dönüştürme
 - Proje ve göreve bağlanabilen sorun kayıtları; 5 Neden, balık kılçığı, A3, düzeltici aksiyon, etki doğrulaması ve öğrenilen dersler
@@ -55,7 +55,7 @@ Değişiklik olduğunda saatlik güvenlik kopyaları `Belgeler\Akış\Save\Backu
 - Dört tema, kişisel profil adı ve erişilebilir klavye odağı
 - Atomik yerel kayıt, checksum doğrulaması, previous/yedek kurtarma ve tek uygulama örneği
 
-PDF raporları masaüstü uygulamasında otomatik olarak `Belgeler\Akış\Save\Exports\<Çalışma Alanı>` klasörüne kaydedilir. [v4.1.1 sürüm ayrıntılarını okuyun](docs/RELEASE_NOTES_v4.1.1.md).
+PDF raporları masaüstü uygulamasında otomatik olarak `Belgeler\Akış\Save\Exports\<Çalışma Alanı>` klasörüne kaydedilir. [v4.1.2 sürüm ayrıntılarını okuyun](docs/RELEASE_NOTES_v4.1.2.md).
 
 ## Neden küçük?
 
@@ -114,7 +114,7 @@ When data changes, hourly safety copies are created under `Documents\Akış\Save
 ### Highlights
 
 - Separate, named workspaces for personal and shared-screen contexts
-- Custom Kanban columns, drag and drop, keyboard moving, labels, blockers, due dates, and multiple assignees
+- Custom Kanban columns, drag and drop, keyboard moving, safely removable labels, blockers, due dates, and multiple assignees
 - Project-grouped Kanban and mind map libraries with collapsible sections
 - 1, 2, 3, 5, 8 and 13-point effort estimates with a visible guide for small, medium/hard and very hard work, plus task/effort burn-up charts based on movement history
 - Two-way conversion from a mind-map idea to a selected Kanban board and column
@@ -130,7 +130,7 @@ When data changes, hourly safety copies are created under `Documents\Akış\Save
 - Portfolio progress, cycle time, delivery rhythm, workload, risk, and cash-flow insights
 - Fully local atomic saving, integrity checks, and automatic recovery copies
 
-Desktop PDF reports are saved automatically under `Documents\Akış\Save\Exports\<Workspace>`. See the [v4.1.1 release notes](docs/RELEASE_NOTES_v4.1.1.md).
+Desktop PDF reports are saved automatically under `Documents\Akış\Save\Exports\<Workspace>`. See the [v4.1.2 release notes](docs/RELEASE_NOTES_v4.1.2.md).
 
 ### Development
 

@@ -2670,6 +2670,51 @@ select:focus-visible {
   gap: 6px;
 }
 
+.label-choice-item {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  overflow: hidden;
+  background: var(--surface);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.label-choice-item:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.label-choice-item .choice-pill {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.label-choice-item .choice-pill:has(input:checked) {
+  background: transparent;
+}
+
+.label-delete-button {
+  display: grid;
+  width: 27px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-left: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.label-delete-button:hover,
+.label-delete-button:focus-visible {
+  background: var(--danger-soft);
+  color: var(--danger);
+  outline: none;
+}
+
 .choice-pill {
   display: flex;
   align-items: center;
@@ -3545,6 +3590,25 @@ select:focus-visible {
   border-style: dashed;
   background: var(--accent-soft);
   color: var(--accent-text);
+}
+
+.choice-pill.pending button {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: currentColor;
+  cursor: pointer;
+}
+
+.choice-pill.pending button:hover,
+.choice-pill.pending button:focus-visible {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  outline: none;
 }
 
 .quick-board-select {
