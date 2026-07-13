@@ -29,6 +29,7 @@ import { newId } from "../seed";
 import { formatTaskWorkDuration, getTaskWorkMs } from "../taskTiming";
 import { getBoardFlowStats } from "../workspaceAnalytics";
 import { effortPointOptions } from "../v4Workflows";
+import { EffortGuide } from "./EffortGuide";
 import type {
   BoardColumn,
   EffortPoints,
@@ -776,6 +777,7 @@ function TaskPanel({
               />
             </label>
           </div>
+          <EffortGuide />
           {(draft.sourceLinks?.length ?? 0) > 0 && <button type="button" className="task-source-note" onClick={onOpenSource}><GitBranch size={15} /><span>{tr ? "Bu görev bir analiz veya zihin haritasından oluşturuldu. Kaynağı aç." : "This task was created from an analysis or mind map. Open its source."}</span><ChevronRight size={15} /></button>}
           <label className="field-label">
             {tr ? "Bekleme / engel nedeni" : "Waiting / blocker reason"}

@@ -2,6 +2,7 @@
 
 import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Pencil, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { getCalendarAgendaEntries, getUpcomingAgendaEntries, localDateKey } from "../calendarAgenda";
 import { useI18n } from "../i18n";
 import type { AppData, CalendarEvent, CalendarEventType, Project } from "../types";
 
@@ -14,10 +15,6 @@ interface CalendarScreenProps {
 
 const eventTypes: CalendarEventType[] = ["meeting", "planned", "note"];
 
-function localDateKey(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
-
 export function CalendarScreen({ data, onSave, onDelete, onNewId }: CalendarScreenProps) {
   const { language, locale } = useI18n();
   const tr = language === "tr";
@@ -25,19 +22,7 @@ export function CalendarScreen({ data, onSave, onDelete, onNewId }: CalendarScre
   const [month, setMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [editing, setEditing] = useState<CalendarEvent | null>(null);
   const projects = data.projects.filter((project) => !project.archived);
-  const dueDates = data.boards.filter((board) => !board.archived).flatMap((board) =>
-    Object.values(board.tasks).filter((task) => task.dueDate && !task.completedAt).map((task) => ({
-      id: `task-${board.id}-${task.id}`,
-      title: task.title,
-      date: task.dueDate!,
-      projectId: board.projectId,
-      kind: "task" as const,
-    })),
-  );
-  const calendarEntries = [
-    ...data.calendarEvents.map((event) => ({ ...event, kind: "event" as const })),
-    ...dueDates,
-  ];
+  const calendarEntries = getCalendarAgendaEntries(data);
   const cells = useMemo(() => {
     const first = new Date(month);
     const mondayIndex = (first.getDay() + 6) % 7;
@@ -48,7 +33,7 @@ export function CalendarScreen({ data, onSave, onDelete, onNewId }: CalendarScre
       return { date, key: localDateKey(date), currentMonth: date.getMonth() === month.getMonth() };
     });
   }, [month]);
-  const upcoming = calendarEntries.filter((entry) => entry.date >= today).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 8);
+  const upcoming = getUpcomingAgendaEntries(data, { limit: 8 });
   const projectById = (id?: string) => projects.find((project) => project.id === id);
   const openNew = (date = today) => setEditing({
     id: onNewId(),
@@ -68,7 +53,7 @@ export function CalendarScreen({ data, onSave, onDelete, onNewId }: CalendarScre
           <div className="calendar-weekdays">{Array.from({ length: 7 }, (_, index) => { const date = new Date(2026, 0, 5 + index); return <span key={index}>{new Intl.DateTimeFormat(locale, { weekday: "short" }).format(date)}</span>; })}</div>
           <div className="calendar-grid">{cells.map((cell) => { const entries = calendarEntries.filter((entry) => entry.date === cell.key); return <button key={cell.key} className={`${cell.currentMonth ? "" : "outside"} ${cell.key === today ? "today" : ""}`} onClick={() => openNew(cell.key)}><strong>{cell.date.getDate()}</strong><span className="calendar-cell-events">{entries.slice(0, 3).map((entry) => <i key={entry.id} className={entry.kind === "task" ? "task" : entry.type} title={entry.title}>{entry.title}</i>)}{entries.length > 3 && <em>+{entries.length - 3}</em>}</span></button>; })}</div>
         </section>
-        <aside className="upcoming-card"><header><CalendarDays size={19} /><div><span className="eyebrow">{tr ? "YAKLAŞANLAR" : "UPCOMING"}</span><h2>{tr ? "Sıradaki planlar" : "Next plans"}</h2></div></header><div className="upcoming-list">{upcoming.map((entry) => { const project = projectById(entry.projectId); return <article key={entry.id}><time>{new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" }).format(new Date(`${entry.date}T12:00:00`))}</time><div><strong>{entry.title}</strong><small>{entry.kind === "task" ? tr ? "Görev son tarihi" : "Task due date" : entry.startTime ? `${entry.startTime}${entry.endTime ? `–${entry.endTime}` : ""}` : tr ? "Tüm gün" : "All day"}{project ? ` · ${project.name}` : ""}</small></div>{entry.kind === "event" && <button className="micro-button" onClick={() => setEditing(entry)} aria-label={tr ? "Etkinliği düzenle" : "Edit event"}><Pencil size={14} /></button>}</article>; })}{upcoming.length === 0 && <p className="calendar-empty">{tr ? "Yaklaşan kayıt yok." : "No upcoming entries."}</p>}</div></aside>
+        <aside className="upcoming-card"><header><CalendarDays size={19} /><div><span className="eyebrow">{tr ? "YAKLAŞANLAR" : "UPCOMING"}</span><h2>{tr ? "Sıradaki planlar" : "Next plans"}</h2></div></header><div className="upcoming-list">{upcoming.map((entry) => { const project = projectById(entry.projectId); return <article key={entry.id}><time>{new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" }).format(new Date(`${entry.date}T12:00:00`))}</time><div><strong>{entry.title}</strong><small>{entry.kind === "task" ? tr ? "Görev son tarihi" : "Task due date" : entry.startTime ? `${entry.startTime}${entry.endTime ? `–${entry.endTime}` : ""}` : tr ? "Tüm gün" : "All day"}{project ? ` · ${project.name}` : ""}</small></div>{entry.kind === "event" && <button className="micro-button" onClick={() => { const event = data.calendarEvents.find((item) => item.id === entry.eventId); if (event) setEditing(event); }} aria-label={tr ? "Etkinliği düzenle" : "Edit event"}><Pencil size={14} /></button>}</article>; })}{upcoming.length === 0 && <p className="calendar-empty">{tr ? "Yaklaşan kayıt yok." : "No upcoming entries."}</p>}</div></aside>
       </div>
       {editing && <EventEditor event={editing} projects={projects} onClose={() => setEditing(null)} onDelete={data.calendarEvents.some((event) => event.id === editing.id) ? () => { onDelete(editing.id); setEditing(null); } : undefined} onSave={(event) => { onSave({ ...event, updatedAt: new Date().toISOString() }); setEditing(null); }} />}
     </main>

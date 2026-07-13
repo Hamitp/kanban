@@ -19,7 +19,7 @@ dependencies = [
 
 [[package]]
 name = "akis"
-version = "4.0.1"
+version = "4.1.0"
 dependencies = [
  "chrono",
  "serde",

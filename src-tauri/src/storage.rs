@@ -18,6 +18,7 @@ use tauri::{AppHandle, Manager, State};
 const BACKUP_INTERVAL: Duration = Duration::from_secs(60 * 60);
 const MAX_BACKUPS: usize = 60;
 const MAX_WORKSPACE_BYTES: u64 = 50 * 1024 * 1024;
+const MAX_REPORT_BYTES: usize = 20 * 1024 * 1024;
 const MAX_SAFE_JS_INTEGER: u64 = 9_007_199_254_740_991;
 
 #[derive(Clone)]
@@ -122,6 +123,15 @@ pub struct SaveResult {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ReportExportResult {
+    path: String,
+    directory: String,
+    filename: String,
+    destination: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RecoveryMetadata {
     status: String,
     source: Option<String>,
@@ -220,7 +230,9 @@ fn validate_workspace(data: &Value) -> bool {
                 preferences.get("defaultCurrency").and_then(Value::as_str),
                 Some("TRY" | "USD" | "EUR" | "GBP")
             )
-            || !preferences.get("freshInstallation").is_some_and(Value::is_boolean)
+            || !preferences
+                .get("freshInstallation")
+                .is_some_and(Value::is_boolean)
         {
             return false;
         }
@@ -244,7 +256,10 @@ fn validate_workspace(data: &Value) -> bool {
             return false;
         };
         if id.is_empty()
-            || workspace.get("name").and_then(Value::as_str).is_none_or(str::is_empty)
+            || workspace
+                .get("name")
+                .and_then(Value::as_str)
+                .is_none_or(str::is_empty)
             || !workspace.get("archived").is_some_and(Value::is_boolean)
             || !workspace.get("data").is_some_and(validate_app_data)
         {
@@ -835,6 +850,146 @@ fn open_directory(path: &Path) -> Result<(), CommandError> {
     Ok(())
 }
 
+fn safe_report_filename(filename: &str) -> String {
+    let stem = filename
+        .trim()
+        .trim_end_matches(|character: char| character == '.' || character.is_whitespace())
+        .strip_suffix(".pdf")
+        .or_else(|| filename.trim().strip_suffix(".PDF"))
+        .unwrap_or(filename.trim());
+    let mut safe = String::with_capacity(stem.len().min(96));
+    for character in stem.chars() {
+        if safe.chars().count() >= 96 {
+            break;
+        }
+        if character.is_control()
+            || matches!(
+                character,
+                '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|'
+            )
+        {
+            safe.push('_');
+        } else {
+            safe.push(character);
+        }
+    }
+    let safe = safe.trim().trim_matches('.');
+    format!(
+        "{}.pdf",
+        if safe.is_empty() {
+            "akis-sorun-raporu"
+        } else {
+            safe
+        }
+    )
+}
+
+fn safe_workspace_folder(workspace_id: &str, workspace_name: &str) -> Result<String, CommandError> {
+    let workspace_id = workspace_id.trim();
+    if workspace_id.is_empty() || workspace_id.len() > 512 {
+        return Err(CommandError::new(
+            "INVALID_WORKSPACE_ID",
+            "Rapor klasörü için geçerli bir çalışma alanı kimliği gerekli",
+        ));
+    }
+
+    let mut safe_name = String::with_capacity(workspace_name.len().min(64));
+    for (index, character) in workspace_name.trim().chars().enumerate() {
+        if index >= 64 {
+            break;
+        }
+        if character.is_control()
+            || matches!(
+                character,
+                '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|'
+            )
+        {
+            safe_name.push('_');
+        } else {
+            safe_name.push(character);
+        }
+    }
+    let safe_name = safe_name.trim().trim_matches('.');
+    let safe_name = if safe_name.is_empty() {
+        "Calisma-Alani"
+    } else {
+        safe_name
+    };
+    let identity = format!("{:x}", Sha256::digest(workspace_id.as_bytes()));
+    Ok(format!("{safe_name}--{}", &identity[..12]))
+}
+
+fn workspace_exports_directory(
+    paths: &StoragePaths,
+    workspace_id: &str,
+    workspace_name: &str,
+) -> Result<PathBuf, CommandError> {
+    Ok(paths
+        .save_directory
+        .join("Exports")
+        .join(safe_workspace_folder(workspace_id, workspace_name)?))
+}
+
+fn unique_report_path(directory: &Path, filename: &str) -> PathBuf {
+    let requested = directory.join(filename);
+    if !requested.exists() {
+        return requested;
+    }
+    let stem = Path::new(filename)
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("akis-sorun-raporu");
+    let stamp = Utc::now().format("%Y%m%d-%H%M%S");
+    directory.join(format!("{stem}-{stamp}.pdf"))
+}
+
+fn write_problem_report(
+    paths: &StoragePaths,
+    workspace_id: &str,
+    workspace_name: &str,
+    filename: &str,
+    bytes: &[u8],
+) -> Result<ReportExportResult, CommandError> {
+    if bytes.len() > MAX_REPORT_BYTES {
+        return Err(CommandError::new(
+            "REPORT_TOO_LARGE",
+            "PDF raporu 20 MB sınırını aşıyor",
+        ));
+    }
+    if !bytes.starts_with(b"%PDF-") {
+        return Err(CommandError::new(
+            "INVALID_REPORT",
+            "Oluşturulan dosya geçerli bir PDF değil",
+        ));
+    }
+    let exports = workspace_exports_directory(paths, workspace_id, workspace_name)?;
+    fs::create_dir_all(&exports)
+        .map_err(|error| CommandError::io("Rapor klasörü oluşturulamadı", error))?;
+    let safe_name = safe_report_filename(filename);
+    let target = unique_report_path(&exports, &safe_name);
+    let temporary = exports.join(format!(
+        ".{}.tmp",
+        target
+            .file_name()
+            .and_then(|value| value.to_str())
+            .unwrap_or("report.pdf")
+    ));
+    write_durable(&temporary, bytes)?;
+    fs::rename(&temporary, &target)
+        .map_err(|error| CommandError::io("PDF raporu tamamlanamadı", error))?;
+    let final_name = target
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or(&safe_name)
+        .to_string();
+    Ok(ReportExportResult {
+        path: path_text(&target),
+        directory: path_text(&exports),
+        filename: final_name,
+        destination: "desktop-exports".into(),
+    })
+}
+
 #[tauri::command]
 pub async fn open_save_folder(
     app: AppHandle,
@@ -853,11 +1008,147 @@ pub async fn open_save_folder(
     .map_err(blocking_join_error)?
 }
 
+#[tauri::command]
+pub async fn save_problem_report(
+    app: AppHandle,
+    state: State<'_, StorageRuntime>,
+    workspace_id: String,
+    workspace_name: String,
+    filename: String,
+    bytes: Vec<u8>,
+) -> Result<ReportExportResult, CommandError> {
+    let runtime = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let _guard = lock_runtime(&runtime)?;
+        let paths = StoragePaths::for_app(&app)?;
+        ensure_directories(&paths)?;
+        write_problem_report(&paths, &workspace_id, &workspace_name, &filename, &bytes)
+    })
+    .await
+    .map_err(blocking_join_error)?
+}
+
+#[tauri::command]
+pub async fn open_exports_folder(
+    app: AppHandle,
+    state: State<'_, StorageRuntime>,
+    workspace_id: String,
+    workspace_name: String,
+) -> Result<String, CommandError> {
+    let runtime = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let _guard = lock_runtime(&runtime)?;
+        let paths = StoragePaths::for_app(&app)?;
+        let exports = workspace_exports_directory(&paths, &workspace_id, &workspace_name)?;
+        fs::create_dir_all(&exports)
+            .map_err(|error| CommandError::io("Rapor klasörü oluşturulamadı", error))?;
+        open_directory(&exports)?;
+        Ok(String::new())
+    })
+    .await
+    .map_err(blocking_join_error)?
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
     use tempfile::tempdir;
+
+    #[test]
+    fn report_filename_is_sanitized_and_keeps_unicode() {
+        assert_eq!(
+            safe_report_filename("Kök neden: müşteri/teslim.pdf"),
+            "Kök neden_ müşteri_teslim.pdf"
+        );
+        assert_eq!(safe_report_filename("../"), "_.pdf");
+        assert_eq!(safe_report_filename("   "), "akis-sorun-raporu.pdf");
+    }
+
+    #[test]
+    fn workspace_export_folder_is_a_safe_single_component() {
+        let first = safe_workspace_folder("workspace-personal", "../Müşteri\\A:*?")
+            .expect("safe workspace folder");
+        let second = safe_workspace_folder("workspace-company", "../Müşteri\\A:*?")
+            .expect("safe workspace folder");
+
+        assert_eq!(Path::new(&first).components().count(), 1);
+        assert!(!first.contains('/') && !first.contains('\\'));
+        assert!(!first.starts_with('.'));
+        assert_ne!(
+            first, second,
+            "different workspace ids must not share a folder"
+        );
+        assert_eq!(
+            first,
+            safe_workspace_folder("workspace-personal", "../Müşteri\\A:*?")
+                .expect("stable workspace folder")
+        );
+    }
+
+    #[test]
+    fn workspace_export_folder_rejects_an_empty_identity() {
+        let error = safe_workspace_folder("   ", "Kişisel Alanım")
+            .expect_err("empty workspace ids must be rejected");
+        assert_eq!(error.code, "INVALID_WORKSPACE_ID");
+    }
+
+    #[test]
+    fn problem_report_requires_a_pdf_signature() {
+        let directory = tempdir().expect("temp");
+        let paths = StoragePaths::under_documents(directory.path());
+        ensure_directories(&paths).expect("directories");
+        let error = write_problem_report(
+            &paths,
+            "workspace-personal",
+            "Kişisel Alanım",
+            "rapor.pdf",
+            b"not a pdf",
+        )
+        .expect_err("invalid report");
+        assert_eq!(error.code, "INVALID_REPORT");
+    }
+
+    #[test]
+    fn problem_reports_are_isolated_by_workspace() {
+        let directory = tempdir().expect("temp");
+        let paths = StoragePaths::under_documents(directory.path());
+        ensure_directories(&paths).expect("directories");
+
+        let personal = write_problem_report(
+            &paths,
+            "workspace-personal",
+            "Kişisel Alanım",
+            "rapor.pdf",
+            b"%PDF-1.7\n",
+        )
+        .expect("personal report");
+        let company = write_problem_report(
+            &paths,
+            "workspace-company",
+            "Şirket Alanı",
+            "rapor.pdf",
+            b"%PDF-1.7\n",
+        )
+        .expect("company report");
+
+        let exports_root = paths.save_directory.join("Exports");
+        let personal_path = Path::new(&personal.path);
+        let company_path = Path::new(&company.path);
+        assert!(personal_path.starts_with(&exports_root));
+        assert!(company_path.starts_with(&exports_root));
+        assert_ne!(personal.directory, company.directory);
+        assert_eq!(personal.destination, "desktop-exports");
+        assert_eq!(company.destination, "desktop-exports");
+        assert_eq!(
+            fs::read(personal_path).expect("personal bytes"),
+            b"%PDF-1.7\n"
+        );
+        assert_eq!(
+            fs::read(company_path).expect("company bytes"),
+            b"%PDF-1.7\n"
+        );
+    }
 
     fn workspace(name: &str) -> Value {
         json!({

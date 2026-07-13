@@ -119,3 +119,33 @@ test("migration removes broken task links without deleting analysis or ideas", (
   assert.equal(migrated.workspaces[0].data.mindMaps[0].nodes[0].linkedTask, undefined);
   assert.equal(migrated.workspaces[0].data.mindMaps[0].nodes[0].title, "Fikir");
 });
+
+test("normalization preserves 13 effort points and rejects values above the limit", () => {
+  const stamp = "2026-07-12T12:00:00.000Z";
+  const store = createWorkspaceStoreFromLegacy(legacyData(), "personal", stamp);
+  const data = store.workspaces[0].data;
+  const originalTask = data.boards[0].tasks["task-1"];
+  originalTask.effortPoints = 13;
+  data.boards[0].tasks["task-2"] = {
+    ...originalTask,
+    id: "task-2",
+    title: "Geçersiz puanlı görev",
+    effortPoints: 21,
+  };
+  data.boards[0].columns[0].taskIds.push("task-2");
+
+  const issue = createProblemIssue("issue-effort", "project-1", "Puan testi", stamp);
+  issue.actions = [
+    { id: "action-13", title: "Zor aksiyon", description: "", assigneeIds: [], effortPoints: 13, createdAt: stamp, updatedAt: stamp },
+    { id: "action-21", title: "Geçersiz aksiyon", description: "", assigneeIds: [], effortPoints: 21, createdAt: stamp, updatedAt: stamp },
+  ];
+  data.issues = [issue];
+
+  const normalized = normalizeWorkspaceStore(store);
+  assert.ok(normalized);
+  const normalizedData = normalized.workspaces[0].data;
+  assert.equal(normalizedData.boards[0].tasks["task-1"].effortPoints, 13);
+  assert.equal(normalizedData.boards[0].tasks["task-2"].effortPoints, 1);
+  assert.equal(normalizedData.issues[0].actions[0].effortPoints, 13);
+  assert.equal(normalizedData.issues[0].actions[1].effortPoints, 1);
+});

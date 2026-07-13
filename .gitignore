@@ -11,6 +11,7 @@
 /release/
 /outputs/
 /work/
+/tmp/
 /.dev-server.*.log
 /.desktop-*.log
 

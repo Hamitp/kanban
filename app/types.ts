@@ -4,7 +4,7 @@ export type CurrencyCode = "TRY" | "USD" | "EUR" | "GBP";
 export type Priority = "low" | "medium" | "high" | "critical";
 export type ItemKind = "board" | "mindmap";
 export type ProjectStatus = "active" | "completed" | "delivered";
-export type EffortPoints = 1 | 2 | 3 | 5 | 8;
+export type EffortPoints = 1 | 2 | 3 | 5 | 8 | 13;
 export type FlowRole = "backlog" | "planned" | "active" | "done";
 export type IssueStatus = "open" | "investigating" | "implementing" | "verifying" | "closed";
 export type IssueSeverity = "low" | "medium" | "high" | "critical";
@@ -280,7 +280,7 @@ export type Screen =
   | { kind: "boards" }
   | { kind: "mindmaps" }
   | { kind: "insights" }
-  | { kind: "issues" }
+  | { kind: "issues"; projectId?: string }
   | { kind: "issue"; id: string }
   | { kind: "calendar" }
   | { kind: "project"; id: string }

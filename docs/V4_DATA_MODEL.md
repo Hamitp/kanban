@@ -9,7 +9,7 @@
 
 ## Görev genişletmeleri
 
-- `effortPoints`: `1 | 2 | 3 | 5 | 8`, eksikse 1.
+- `effortPoints`: `1 | 2 | 3 | 5 | 8 | 13`, eksikse 1.
 - `transitions`: görevin kaynak/hedef sütun ve akış anlamını tarih ile kaydeden olaylar.
 - `sourceLinks`: zihin düğümü, sorun veya A3 aksiyonu gibi kaynaklara güvenli bağlantılar.
 

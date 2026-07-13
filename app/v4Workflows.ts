@@ -13,7 +13,7 @@ import type {
   TaskTransition,
 } from "./types";
 
-export const effortPointOptions: EffortPoints[] = [1, 2, 3, 5, 8];
+export const effortPointOptions: EffortPoints[] = [1, 2, 3, 5, 8, 13];
 export const committedRoles = new Set<FlowRole>(["planned", "active", "done"]);
 export type BurnupRangeDays = 7 | 15 | 21 | 30 | 90;
 

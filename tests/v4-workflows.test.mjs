@@ -4,8 +4,10 @@ import test from "node:test";
 const {
   appendTaskTransition,
   createProblemIssue,
+  effortPointOptions,
   getIssueInsights,
   getProjectBurnup,
+  taskEffort,
   transitionIssueStatus,
 } = await import(new URL("../app/v4Workflows.ts", import.meta.url));
 
@@ -40,6 +42,23 @@ test("task transitions append without losing previous history", () => {
   assert.equal(moved.transitions.length, 2);
   assert.equal(moved.transitions[1].toRole, "done");
   assert.equal(moved.updatedAt, "2026-07-08T10:00:00.000Z");
+});
+
+test("effort points accept 13 as the maximum supported value", () => {
+  assert.deepEqual(effortPointOptions, [1, 2, 3, 5, 8, 13]);
+  assert.equal(taskEffort({ effortPoints: 13 }), 13);
+  assert.equal(taskEffort({ effortPoints: 21 }), 1);
+
+  const data = workspaceWithTasks();
+  data.boards[0].tasks.t1.effortPoints = 13;
+  const pointView = getProjectBurnup(data, "p1", {
+    today: new Date("2026-07-10T12:00:00.000Z"),
+    mode: "points",
+  });
+  assert.deepEqual(
+    { total: pointView.total, completed: pointView.completed, remaining: pointView.remaining },
+    { total: 18, completed: 5, remaining: 13 },
+  );
 });
 
 test("burn-up excludes backlog and supports task and effort views", () => {

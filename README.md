@@ -39,10 +39,12 @@ Değişiklik olduğunda saatlik güvenlik kopyaları `Belgeler\Akış\Save\Backu
 - Boş alanda sol tuşla veya orta tuşla gezinen; `Ctrl + fare tekerleği` ile yakınlaşan çalışma alanları
 - Sürükle-bırak, görünür bırakma hedefleri, kenarda otomatik kaydırma ve klavyeyle görev taşıma
 - Etiketler, bekleme/engel nedeni, öncelik, son tarih ve birden fazla kişi ataması
-- 1, 2, 3, 5 ve 8 puanlık iş yükü tahmini; görev hareket geçmişinden üretilen görev/puan bazlı burn-up grafiği
+- 1, 2, 3, 5, 8 ve 13 puanlık iş yükü tahmini; küçük, orta/zor ve çok zor işler için görünür puanlama rehberi; görev hareket geçmişinden üretilen görev/puan bazlı burn-up grafiği
 - Zihin haritasındaki bir fikri hedef pano ve sütunu seçerek çift yönlü bağlantılı Kanban görevine dönüştürme
 - Proje ve göreve bağlanabilen sorun kayıtları; 5 Neden, balık kılçığı, A3, düzeltici aksiyon, etki doğrulaması ve öğrenilen dersler
-- Toplantı, planlı iş ve not eklenebilen sade aylık takvim; görev son tarihlerinin otomatik görünümü
+- Proje detayında açık sorun paneli; Genel Bakışta aktif projeler için kritik/yüksek, doğrulama ve geciken takip sayılarını içeren portföy sorun özeti
+- A3 yatay tek sayfa, gerçek balık kılçığı, görsel 5 Neden zinciri veya birleşik sorun çözme dosyasını Türkçe/İngilizce ve renkli/siyah-beyaz hazırlayan çevrimdışı PDF, baskı önizleme ve yazdırma
+- Toplantı, planlı iş ve not eklenebilen sade aylık takvim; görev son tarihlerinin otomatik görünümü ve Genel Bakışta birleşik **Önümüzdeki 7 Gün** gündemi
 - Görevin aktif çalışma süresi ve tamamlanma süresi geçmişi
 - Aktif, tamamlandı ve müşteriye teslim edildi proje aşamaları
 - Anlaşılan tutar, kısmi/tam tahsilat, bekleyen alacak ve tahsilat geçmişi
@@ -52,6 +54,8 @@ Değişiklik olduğunda saatlik güvenlik kopyaları `Belgeler\Akış\Save\Backu
 - Arşivleme, geri getirme ve başka projeye bağımsız kopyalama
 - Dört tema, kişisel profil adı ve erişilebilir klavye odağı
 - Atomik yerel kayıt, checksum doğrulaması, previous/yedek kurtarma ve tek uygulama örneği
+
+PDF raporları masaüstü uygulamasında otomatik olarak `Belgeler\Akış\Save\Exports\<Çalışma Alanı>` klasörüne kaydedilir. [v4.1.0 sürüm ayrıntılarını okuyun](docs/RELEASE_NOTES_v4.1.0.md).
 
 ## Neden küçük?
 
@@ -112,10 +116,12 @@ When data changes, hourly safety copies are created under `Documents\Akış\Save
 - Separate, named workspaces for personal and shared-screen contexts
 - Custom Kanban columns, drag and drop, keyboard moving, labels, blockers, due dates, and multiple assignees
 - Project-grouped Kanban and mind map libraries with collapsible sections
-- 1, 2, 3, 5 and 8-point effort estimates plus task/effort burn-up charts based on movement history
+- 1, 2, 3, 5, 8 and 13-point effort estimates with a visible guide for small, medium/hard and very hard work, plus task/effort burn-up charts based on movement history
 - Two-way conversion from a mind-map idea to a selected Kanban board and column
 - Project/task-linked problem records with 5 Whys, fishbone, A3, corrective tasks, effectiveness verification, and lessons learned
-- A simple monthly calendar for meetings, planned work, notes, and automatically derived task due dates
+- A project-level open-problems panel and a portfolio problem summary for active projects on Overview
+- Fully offline PDF, print preview and printing for a single-page landscape A3, a true fishbone diagram, a visual 5 Whys chain, or a combined problem-solving dossier; output can be Turkish/English and color/monochrome
+- A simple monthly calendar for meetings, planned work and notes, with automatically derived task due dates and a combined **Next 7 Days** agenda on Overview
 - Elegant mind maps with collapsible details, auto layout, panning, and zoom
 - Task active-time and completion-time history
 - Active, completed, and delivered project stages
@@ -123,6 +129,8 @@ When data changes, hourly safety copies are created under `Documents\Akış\Save
 - Currency-separated financial dashboards: amounts in different currencies are never combined without exchange-rate data
 - Portfolio progress, cycle time, delivery rhythm, workload, risk, and cash-flow insights
 - Fully local atomic saving, integrity checks, and automatic recovery copies
+
+Desktop PDF reports are saved automatically under `Documents\Akış\Save\Exports\<Workspace>`. See the [v4.1.0 release notes](docs/RELEASE_NOTES_v4.1.0.md).
 
 ### Development
 

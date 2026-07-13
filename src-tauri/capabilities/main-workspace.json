@@ -10,6 +10,8 @@
     "allow-load",
     "allow-save",
     "allow-info",
-    "allow-open-save-folder"
+    "allow-open-save-folder",
+    "allow-save-problem-report",
+    "allow-open-exports-folder"
   ]
 }

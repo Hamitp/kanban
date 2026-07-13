@@ -52,7 +52,17 @@ import { InsightsScreen } from "./components/InsightsScreen";
 import { MindMapView } from "./components/MindMapView";
 import { BurnupChart } from "./components/BurnupChart";
 import { CalendarScreen } from "./components/CalendarScreen";
+import {
+  PortfolioIssueSummaryPanel,
+  ProjectOpenIssuesPanel,
+  UpcomingSevenDaysPanel,
+} from "./components/DashboardPanels";
 import { IssueDetailScreen, ProblemsScreen } from "./components/ProblemSolvingScreen";
+import { getUpcomingAgendaEntries } from "./calendarAgenda";
+import {
+  getPortfolioOpenIssueSummary,
+  getProjectOpenIssueSummary,
+} from "./dashboardAnalytics";
 import {
   currencyCodes,
   formatMoney,
@@ -1739,12 +1749,12 @@ function ShellContent({
     return <CalendarScreen data={data} onSave={onSaveCalendarEvent} onDelete={onDeleteCalendarEvent} onNewId={newId} />;
   }
   if (screen.kind === "issues") {
-    return <ProblemsScreen data={data} onNavigate={onNavigate} onCreate={onCreateIssue} />;
+    return <ProblemsScreen key={screen.projectId ?? "all-projects"} data={data} initialProjectId={screen.projectId} onNavigate={onNavigate} onCreate={onCreateIssue} />;
   }
   if (screen.kind === "issue") {
     const issue = data.issues.find((item) => item.id === screen.id);
     if (!issue) return <main className="shell-page missing-item-page"><EmptyState title={language === "tr" ? "Sorun kaydı bulunamadı" : "Problem record not found"} description={language === "tr" ? "Kayıt silinmiş veya artık erişilemiyor olabilir." : "The record may have been deleted or is no longer available."} actionLabel={language === "tr" ? "Sorunlara dön" : "Back to problems"} onAction={() => onNavigate({ kind: "issues" })} /></main>;
-    return <IssueDetailScreen issue={issue} data={data} onBack={() => onNavigate({ kind: "issues" })} onSave={onSaveIssue} onDelete={() => onDeleteIssue(issue.id)} onCreateTask={onCreateCorrectiveTask} onOpenTask={(boardId) => onNavigate({ kind: "board", id: boardId })} onNewId={newId} />;
+    return <IssueDetailScreen issue={issue} data={data} workspace={{ id: activeWorkspaceId, name: data.workspaceName }} onBack={() => onNavigate({ kind: "issues", projectId: issue.projectId })} onSave={onSaveIssue} onDelete={() => onDeleteIssue(issue.id)} onCreateTask={onCreateCorrectiveTask} onOpenTask={(boardId) => onNavigate({ kind: "board", id: boardId })} onNewId={newId} />;
   }
   if (screen.kind === "project") {
     const project = data.projects.find((item) => item.id === screen.id);
@@ -1912,6 +1922,8 @@ function HomeScreen({
   const finance = getPortfolioFinance(data.projects);
   const financeValues = (metric: "activeWorkKurus" | "receivableKurus" | "collectedKurus") =>
     getPortfolioCurrencies(finance, metric).map((currency) => ({ currency, value: formatMoney(finance[currency][metric], currency, language) }));
+  const portfolioIssueSummary = getPortfolioOpenIssueSummary(data);
+  const upcomingSevenDays = getUpcomingAgendaEntries(data, { days: 7 });
   const hour = new Date().getHours();
   const greeting = language === "tr"
     ? hour < 12 ? "Günaydın" : hour < 18 ? "İyi günler" : "İyi akşamlar"
@@ -2011,6 +2023,11 @@ function HomeScreen({
           </button>
           <small>{quickBoard ? `${quickBoard.title} · ${language === "tr" ? "atanmamış görev" : "unassigned task"}` : language === "tr" ? "Önce aktif bir projede Kanban panosu oluşturun" : "Create a Kanban board in an active project first"}</small>
         </aside>
+      </section>
+
+      <section className="dashboard-grid attention">
+        <PortfolioIssueSummaryPanel summary={portfolioIssueSummary} data={data} onNavigate={onNavigate} />
+        <UpcomingSevenDaysPanel entries={upcomingSevenDays} data={data} onNavigate={onNavigate} />
       </section>
 
       <section className="dashboard-grid lower">
@@ -2120,6 +2137,7 @@ function ProjectScreen({
     b.receivedOn.localeCompare(a.receivedOn),
   );
   const projectIssues = data.issues.filter((issue) => issue.projectId === project.id);
+  const projectIssueSummary = getProjectOpenIssueSummary(data, project.id);
   return (
     <main className="shell-page project-page">
       <button className="project-back-button" onClick={onBack}><ArrowLeft size={16} /> {language === "tr" ? "Projelere dön" : "Back to projects"}</button>
@@ -2140,8 +2158,10 @@ function ProjectScreen({
         <span><LayoutDashboard size={16} /><strong>{boards.length}</strong> {language === "tr" ? "Kanban panosu" : "Kanban boards"}</span>
         <span><MapIcon size={16} /><strong>{mindMaps.length}</strong> {language === "tr" ? "zihin haritası" : "mind maps"}</span>
         <span><ListTodo size={16} /><strong>{boards.reduce((sum, board) => sum + Object.keys(board.tasks).length, 0)}</strong> {language === "tr" ? "toplam görev" : "total tasks"}</span>
-        <button onClick={() => onNavigate({ kind: "issues" })}><CircleAlert size={16} /><strong>{projectIssues.filter((issue) => issue.status !== "closed").length}</strong> {language === "tr" ? "açık sorun" : "open problems"}</button>
+        <button onClick={() => onNavigate({ kind: "issues", projectId: project.id })}><CircleAlert size={16} /><strong>{projectIssues.filter((issue) => issue.status !== "closed").length}</strong> {language === "tr" ? "açık sorun" : "open problems"}</button>
       </section>
+
+      <ProjectOpenIssuesPanel summary={projectIssueSummary} projectId={project.id} data={data} onNavigate={onNavigate} />
 
       <BurnupChart data={data} project={project} />
 

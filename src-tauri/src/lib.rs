@@ -18,7 +18,9 @@ pub fn run() {
             storage::load,
             storage::save,
             storage::info,
-            storage::open_save_folder
+            storage::open_save_folder,
+            storage::save_problem_report,
+            storage::open_exports_folder
         ])
         .build(tauri::generate_context!())
         .expect("Akış masaüstü uygulaması başlatılamadı");
