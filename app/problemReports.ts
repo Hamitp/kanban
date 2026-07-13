@@ -94,11 +94,18 @@ const copy = {
 export async function loadProblemReportFonts(): Promise<ProblemReportFonts> {
   const regularUrl = new URL("../public/fonts/Vera.ttf", import.meta.url);
   const boldUrl = new URL("../public/fonts/VeraBd.ttf", import.meta.url);
-  const [regular, bold] = await Promise.all([
-    fetch(regularUrl).then((response) => response.arrayBuffer()),
-    fetch(boldUrl).then((response) => response.arrayBuffer()),
-  ]);
-  return { regular: new Uint8Array(regular), bold: new Uint8Array(bold) };
+  try {
+    const [regular, bold] = await Promise.all([regularUrl, boldUrl].map(async (url) => {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Font asset returned ${response.status}`);
+      const bytes = await response.arrayBuffer();
+      if (bytes.byteLength < 1_000) throw new Error("Font asset is incomplete");
+      return bytes;
+    }));
+    return { regular: new Uint8Array(regular), bold: new Uint8Array(bold) };
+  } catch (error) {
+    throw new Error("PDF_FONT_ASSET_UNAVAILABLE", { cause: error });
+  }
 }
 
 function wrapText(text: string, font: PDFFont, size: number, width: number): string[] {

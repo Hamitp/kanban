@@ -55,7 +55,7 @@ Değişiklik olduğunda saatlik güvenlik kopyaları `Belgeler\Akış\Save\Backu
 - Dört tema, kişisel profil adı ve erişilebilir klavye odağı
 - Atomik yerel kayıt, checksum doğrulaması, previous/yedek kurtarma ve tek uygulama örneği
 
-PDF raporları masaüstü uygulamasında otomatik olarak `Belgeler\Akış\Save\Exports\<Çalışma Alanı>` klasörüne kaydedilir. [v4.1.0 sürüm ayrıntılarını okuyun](docs/RELEASE_NOTES_v4.1.0.md).
+PDF raporları masaüstü uygulamasında otomatik olarak `Belgeler\Akış\Save\Exports\<Çalışma Alanı>` klasörüne kaydedilir. [v4.1.1 sürüm ayrıntılarını okuyun](docs/RELEASE_NOTES_v4.1.1.md).
 
 ## Neden küçük?
 
@@ -130,7 +130,7 @@ When data changes, hourly safety copies are created under `Documents\Akış\Save
 - Portfolio progress, cycle time, delivery rhythm, workload, risk, and cash-flow insights
 - Fully local atomic saving, integrity checks, and automatic recovery copies
 
-Desktop PDF reports are saved automatically under `Documents\Akış\Save\Exports\<Workspace>`. See the [v4.1.0 release notes](docs/RELEASE_NOTES_v4.1.0.md).
+Desktop PDF reports are saved automatically under `Documents\Akış\Save\Exports\<Workspace>`. See the [v4.1.1 release notes](docs/RELEASE_NOTES_v4.1.1.md).
 
 ### Development
 

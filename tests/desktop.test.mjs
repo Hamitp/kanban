@@ -4,16 +4,21 @@ import test from "node:test";
 
 const root = new URL("../", import.meta.url);
 
-test("Tauri renderer is local and exposes only the required IPC surface", async () => {
-  const [index, storage, capability] = await Promise.all([
+test("Tauri renderer is local, permits packaged assets and exposes only the required IPC surface", async () => {
+  const [index, storage, capability, tauriText, reportSource] = await Promise.all([
     readFile(new URL("desktop/index.html", root), "utf8"),
     readFile(new URL("app/storage.ts", root), "utf8"),
     readFile(new URL("src-tauri/capabilities/main-workspace.json", root), "utf8"),
+    readFile(new URL("src-tauri/tauri.conf.json", root), "utf8"),
+    readFile(new URL("app/problemReports.ts", root), "utf8"),
   ]);
 
   assert.match(index, /default-src 'self'/);
-  assert.match(index, /connect-src ipc: http:\/\/ipc\.localhost/);
+  assert.match(index, /connect-src 'self' ipc: http:\/\/ipc\.localhost/);
   assert.doesNotMatch(index, /https:\/\//);
+  assert.match(JSON.parse(tauriText).app.security.csp, /connect-src 'self' ipc: http:\/\/ipc\.localhost/);
+  assert.match(reportSource, /new URL\("\.\.\/public\/fonts\/Vera\.ttf", import\.meta\.url\)/);
+  assert.match(reportSource, /PDF_FONT_ASSET_UNAVAILABLE/);
   assert.match(storage, /invoke<TauriLoadResult>\("load"\)/);
   assert.match(storage, /invoke\("save", \{ data: normalized \}\)/);
   assert.match(storage, /WORKSPACE_RECOVERY_REQUIRED/);

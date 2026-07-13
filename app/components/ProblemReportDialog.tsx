@@ -86,7 +86,9 @@ export function ProblemReportDialog({ input, workspace, appLanguage, initialKind
       const bytes = await createProblemReportPdf(input, options, fonts);
       setSaved(await saveProblemReportPdf(bytes, problemReportFilename(input, options), workspace));
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : tr ? "PDF oluşturulamadı." : "The PDF could not be created.");
+      setError(reason instanceof Error && reason.message === "PDF_FONT_ASSET_UNAVAILABLE"
+        ? tr ? "PDF yazı tipleri uygulama paketinden yüklenemedi." : "PDF fonts could not be loaded from the application package."
+        : reason instanceof Error ? reason.message : tr ? "PDF oluşturulamadı." : "The PDF could not be created.");
     } finally { setBusy(false); }
   };
 
