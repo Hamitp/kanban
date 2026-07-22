@@ -6,12 +6,14 @@ import { useI18n } from "../i18n";
 import { formatCompactMoney, formatMoney, getPortfolioCurrencies } from "../projectFinance";
 import { getTaskWorkMs } from "../taskTiming";
 import type { AppData, CurrencyCode, Screen } from "../types";
-import { getWorkspaceInsights } from "../workspaceAnalytics";
+import { getWorkspaceInsights, sortMemberWorkload } from "../workspaceAnalytics";
+import type { MemberWorkloadMetric } from "../workspaceAnalytics";
 import { getIssueInsights } from "../v4Workflows";
 
 export function InsightsScreen({ data, onNavigate }: { data: AppData; onNavigate: (screen: Screen) => void }) {
   const { language } = useI18n();
   const [referenceTime] = useState(() => Date.now());
+  const [workloadMetric, setWorkloadMetric] = useState<MemberWorkloadMetric>("tasks");
   const insights = getWorkspaceInsights(data, new Date(), language);
   const flowTotal = Object.values(insights.flow).reduce((sum, value) => sum + value, 0);
   const maxThroughput = Math.max(1, ...insights.weeklyThroughput.map((item) => item.count));
@@ -19,7 +21,10 @@ export function InsightsScreen({ data, onNavigate }: { data: AppData; onNavigate
   const [requestedCashflowCurrency, setCashflowCurrency] = useState<CurrencyCode>(cashflowCurrencies[0]);
   const cashflowCurrency = cashflowCurrencies.includes(requestedCashflowCurrency) ? requestedCashflowCurrency : cashflowCurrencies[0];
   const maxCashflow = Math.max(1, ...insights.monthlyCashflow.map((item) => item.amounts[cashflowCurrency]));
-  const maxWorkload = Math.max(1, ...insights.memberWorkload.map((item) => item.count));
+  const memberWorkload = sortMemberWorkload(insights.memberWorkload, workloadMetric);
+  const workloadValue = (item: (typeof memberWorkload)[number]) => workloadMetric === "points" ? item.effortPoints : item.count;
+  const maxWorkload = Math.max(1, ...memberWorkload.map(workloadValue));
+  const hasWorkload = memberWorkload.some((item) => workloadValue(item) > 0);
   const completedLastFourWeeks = insights.weeklyThroughput.slice(-4).reduce((sum, item) => sum + item.count, 0);
   const priorFourWeeks = insights.weeklyThroughput.slice(0, 4).reduce((sum, item) => sum + item.count, 0);
   const throughputDelta = completedLastFourWeeks - priorFourWeeks;
@@ -54,7 +59,29 @@ export function InsightsScreen({ data, onNavigate }: { data: AppData; onNavigate
           {insights.finance[cashflowCurrency].collectedKurus ? <div className="vertical-bar-chart cashflow" role="img" aria-label={language === "tr" ? `Toplam tahsil edilen ${formatMoney(insights.finance[cashflowCurrency].collectedKurus, cashflowCurrency, language)}` : `Total collected ${formatMoney(insights.finance[cashflowCurrency].collectedKurus, cashflowCurrency, language)}`}>{insights.monthlyCashflow.map((item) => { const amount = item.amounts[cashflowCurrency]; return <div className="bar-column" key={item.key}><div className="bar-value">{amount ? formatCompactMoney(amount, cashflowCurrency, language) : ""}</div><div className="bar-track"><i style={{ height: `${Math.max(amount ? 12 : 2, (amount / maxCashflow) * 100)}%` }} /></div><span>{item.label}</span></div>; })}</div> : <InsightEmpty text={language === "tr" ? "İlk tahsilat kaydı eklendiğinde aylık para akışı burada görünür." : "Monthly cash flow will appear here after the first payment is recorded."} />}
         </article>
 
-        <article className="insight-card workload-card"><header><div><span className="eyebrow">{language === "tr" ? "KAPASİTE" : "CAPACITY"}</span><h2>{language === "tr" ? "Kişi bazlı görev yükü" : "Workload by person"}</h2></div><Users size={19} /></header>{insights.memberWorkload.some((item) => item.count) ? <div className="horizontal-bars">{insights.memberWorkload.map(({ member, count }) => <div className="horizontal-bar" key={member.id}><span className="member-avatar" style={{ background: member.color }}>{member.initials}</span><strong>{member.name}</strong><div><i style={{ width: `${(count / maxWorkload) * 100}%` }} /></div><span>{count}</span></div>)}</div> : <InsightEmpty text={language === "tr" ? "Öncelikli veya aktif görevler kişilere atandığında yük dağılımı görünür." : "Workload distribution appears when prioritized or active tasks are assigned."} />}</article>
+        <article className="insight-card workload-card">
+          <header className="workload-card-header">
+            <div><span className="eyebrow">{language === "tr" ? "KAPASİTE" : "CAPACITY"}</span><h2>{language === "tr" ? "Kişi bazlı görev yükü" : "Workload by person"}</h2></div>
+            <div className="workload-card-actions">
+              <Users size={19} />
+              <div className="segmented-control workload-metric-control" role="group" aria-label={language === "tr" ? "İş yükü ölçütü" : "Workload metric"}>
+                <button type="button" className={workloadMetric === "tasks" ? "active" : ""} aria-pressed={workloadMetric === "tasks"} onClick={() => setWorkloadMetric("tasks")}>{language === "tr" ? "Görev sayısı" : "Task count"}</button>
+                <button type="button" className={workloadMetric === "points" ? "active" : ""} aria-pressed={workloadMetric === "points"} onClick={() => setWorkloadMetric("points")}>{language === "tr" ? "İş yükü puanı" : "Effort points"}</button>
+              </div>
+            </div>
+          </header>
+          {hasWorkload ? (
+            <div className="horizontal-bars" role="img" aria-label={language === "tr" ? `Aktif projelerde kişi bazlı ${workloadMetric === "points" ? "iş yükü puanı" : "görev sayısı"}` : `${workloadMetric === "points" ? "Effort points" : "Task count"} by person in active projects`}>
+              {memberWorkload.map((item) => {
+                const value = workloadValue(item);
+                const unit = workloadMetric === "points"
+                  ? language === "tr" ? "puan" : value === 1 ? "point" : "points"
+                  : language === "tr" ? "görev" : value === 1 ? "task" : "tasks";
+                return <div className="horizontal-bar" key={item.member.id} aria-label={`${item.member.name}: ${value} ${unit}`}><span className="member-avatar" style={{ background: item.member.color }}>{item.member.initials}</span><strong>{item.member.name}</strong><div><i style={{ width: `${(value / maxWorkload) * 100}%` }} /></div><span className="workload-value">{value} {unit}</span></div>;
+              })}
+            </div>
+          ) : <InsightEmpty text={language === "tr" ? "Aktif projelerde tamamlanmamış görevler kişilere atandığında yük dağılımı görünür." : "Workload distribution appears when unfinished tasks in active projects are assigned."} />}
+        </article>
 
         <article className="insight-card issue-insight-card"><header><div><span className="eyebrow">{language === "tr" ? "SORUN ÖĞRENİMİ" : "PROBLEM LEARNING"}</span><h2>{language === "tr" ? "Kök neden ve çözüm görünümü" : "Root cause and resolution view"}</h2></div><Wrench size={19} /></header>{data.issues.length ? <><div className="issue-insight-metrics"><span><small>{language === "tr" ? "Açık" : "Open"}</small><strong>{issueInsights.open}</strong></span><span><small>{language === "tr" ? "Doğrulamada" : "Verifying"}</small><strong>{issueInsights.verifying}</strong></span><span><small>{language === "tr" ? "Ort. çözüm" : "Avg. resolution"}</small><strong>{issueInsights.averageResolutionDays ? `${issueInsights.averageResolutionDays} ${language === "tr" ? "gün" : "days"}` : "—"}</strong></span></div><div className="root-cause-list">{issueInsights.rootCauses.slice(0, 4).map(([cause, count]) => <div key={cause}><span>{cause}</span><strong>{count}</strong></div>)}{issueInsights.rootCauses.length === 0 && <small>{language === "tr" ? "Kök nedenler doğrulandıkça tekrar eden örüntüler burada görünür." : "Recurring patterns appear as root causes are validated."}</small>}</div><button className="text-button" onClick={() => onNavigate({ kind: "issues" })}>{language === "tr" ? "Sorun çözme araçlarını aç" : "Open problem-solving tools"}</button></> : <InsightEmpty text={language === "tr" ? "İlk sorun kaydıyla kök neden örüntülerini izlemeye başlayın." : "Create the first problem record to begin tracking root cause patterns."} />}</article>
       </section>

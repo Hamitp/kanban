@@ -3724,13 +3724,15 @@ select:focus-visible {
   line-height: 1.5;
 }
 
+.workload-card-actions { display: flex; align-items: center; gap: 10px; }
+.workload-metric-control button { white-space: nowrap; }
 .horizontal-bars { display: grid; gap: 12px; }
-.horizontal-bar { display: grid; grid-template-columns: 30px minmax(100px, 0.7fr) minmax(100px, 1fr) 24px; align-items: center; gap: 9px; }
+.horizontal-bar { display: grid; grid-template-columns: 30px minmax(100px, 0.7fr) minmax(100px, 1fr) minmax(64px, auto); align-items: center; gap: 9px; }
 .horizontal-bar .member-avatar { width: 29px; height: 29px; font-size: 9px; }
 .horizontal-bar > strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; }
 .horizontal-bar > div { height: 7px; overflow: hidden; border-radius: 99px; background: var(--canvas-soft); }
 .horizontal-bar > div i { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
-.horizontal-bar > span:last-child { color: var(--text-soft); font-size: 11px; text-align: right; }
+.horizontal-bar > span:last-child { color: var(--text-soft); font-size: 11px; text-align: right; white-space: nowrap; }
 
 .risk-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
 .risk-list button { min-width: 0; display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); text-align: left; }
@@ -4380,6 +4382,11 @@ select:focus-visible {
   .theme-grid { grid-template-columns: 1fr 1fr; }
   .project-money-grid { grid-template-columns: 1fr; }
   .flow-breakdown { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .workload-card-header { flex-wrap: wrap; }
+  .workload-card-actions { width: 100%; }
+  .workload-card-actions > svg { display: none; }
+  .workload-metric-control { width: 100%; }
+  .horizontal-bar { grid-template-columns: 30px minmax(72px, 0.7fr) minmax(70px, 1fr) minmax(58px, auto); gap: 7px; }
   .vertical-bar-chart { gap: 4px; }
   .bar-column > span { font-size: 9px; }
   .field-grid,

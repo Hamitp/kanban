@@ -49,13 +49,17 @@ Değişiklik olduğunda saatlik güvenlik kopyaları `Belgeler\Akış\Save\Backu
 - Aktif, tamamlandı ve müşteriye teslim edildi proje aşamaları
 - Anlaşılan tutar, kısmi/tam tahsilat, bekleyen alacak ve tahsilat geçmişi
 - Proje başına bağımsız Türk lirası, Amerikan doları, Euro veya İngiliz sterlini; farklı para birimlerini yanıltıcı biçimde toplamayan finans ekranları
-- İlerleme, çevrim süresi, haftalık teslim ritmi, iş yükü, risk ve nakit akışı içgörüleri
+- İlerleme, çevrim süresi, haftalık teslim ritmi, risk ve nakit akışı içgörüleri; kişi kapasitesini görev sayısı veya iş yükü puanına göre karşılaştıran görünüm
 - Daraltılabilir fikir ayrıntıları, otomatik düzen ve tümünü sığdırma özellikli zihin haritası
 - Arşivleme, geri getirme ve başka projeye bağımsız kopyalama
 - Dört tema, kişisel profil adı ve erişilebilir klavye odağı
 - Atomik yerel kayıt, checksum doğrulaması, previous/yedek kurtarma ve tek uygulama örneği
 
-PDF raporları masaüstü uygulamasında otomatik olarak `Belgeler\Akış\Save\Exports\<Çalışma Alanı>` klasörüne kaydedilir. [v4.1.2 sürüm ayrıntılarını okuyun](docs/RELEASE_NOTES_v4.1.2.md).
+PDF raporları masaüstü uygulamasında otomatik olarak `Belgeler\Akış\Save\Exports\<Çalışma Alanı>` klasörüne kaydedilir. [v4.2.0 sürüm ayrıntılarını okuyun](docs/RELEASE_NOTES_v4.2.0.md).
+
+### Kişi bazlı iş yükünü kullanma
+
+**İçgörüler > Kişi bazlı görev yükü** kartı ilk açıldığında kişi başına tamamlanmamış **görev sayısını** gösterir. Aynı karttaki **İş yükü puanı** seçeneğiyle kolay ve zor görevlerin etkisini `1–13` puan üzerinden karşılaştırabilirsiniz. Hesap yalnız aktif projelerdeki havuz, önceliklendirilmiş ve aktif görevleri kapsar; biten işler dahil edilmez. Ortak bir görev, tam puanıyla her atanan kişide görünür.
 
 ## Neden küçük?
 
@@ -127,10 +131,14 @@ When data changes, hourly safety copies are created under `Documents\Akış\Save
 - Active, completed, and delivered project stages
 - Project-level TRY, USD, EUR, or GBP finances, partial payments, receivables, and payment history
 - Currency-separated financial dashboards: amounts in different currencies are never combined without exchange-rate data
-- Portfolio progress, cycle time, delivery rhythm, workload, risk, and cash-flow insights
+- Portfolio progress, cycle time, delivery rhythm, risk, and cash-flow insights, including per-person capacity compared by task count or effort points
 - Fully local atomic saving, integrity checks, and automatic recovery copies
 
-Desktop PDF reports are saved automatically under `Documents\Akış\Save\Exports\<Workspace>`. See the [v4.1.2 release notes](docs/RELEASE_NOTES_v4.1.2.md).
+Desktop PDF reports are saved automatically under `Documents\Akış\Save\Exports\<Workspace>`. See the [v4.2.0 release notes](docs/RELEASE_NOTES_v4.2.0.md).
+
+### Using workload by person
+
+The **Insights > Workload by person** card opens with each person's unfinished **task count**. Select **Effort points** on the same card to compare the impact of easy and difficult tasks on the `1–13` point scale. The calculation covers backlog, prioritized, and active tasks in active projects; completed work is excluded. A shared task appears at its full value for every assignee.
 
 ### Development
 

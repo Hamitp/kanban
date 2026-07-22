@@ -1,6 +1,7 @@
-import { currencyCodes, getPortfolioFinance } from "./projectFinance.ts";
+import { currencyCodes, getPortfolioFinance, getProjectStatus } from "./projectFinance.ts";
 import { getTaskWorkMs } from "./taskTiming.ts";
-import type { AppData, CurrencyCode, KanbanBoard, Language, Project, TaskCard } from "./types";
+import type { AppData, CurrencyCode, KanbanBoard, Language, Member, Project, TaskCard } from "./types";
+import { taskEffort } from "./v4Workflows.ts";
 
 export interface FlowStats {
   backlog: number;
@@ -169,17 +170,41 @@ export function getMonthlyCashflow(data: AppData, today = new Date(), months = 6
   return buckets;
 }
 
+export type MemberWorkloadMetric = "tasks" | "points";
+
+export interface MemberWorkloadItem {
+  member: Member;
+  count: number;
+  effortPoints: number;
+}
+
+export function sortMemberWorkload(items: MemberWorkloadItem[], metric: MemberWorkloadMetric) {
+  const value = (item: MemberWorkloadItem) => metric === "points" ? item.effortPoints : item.count;
+  return [...items].sort(
+    (a, b) => value(b) - value(a) || a.member.name.localeCompare(b.member.name, "tr"),
+  );
+}
+
 export function getMemberWorkload(data: AppData, tasks: LocatedTask[]) {
-  return data.members
+  const activeProjectIds = new Set(
+    data.projects
+      .filter((project) => !project.archived && getProjectStatus(project) === "active")
+      .map((project) => project.id),
+  );
+  const eligibleTasks = tasks.filter(
+    ({ board, role }) => !board.archived && activeProjectIds.has(board.projectId) && role !== "done",
+  );
+  const workload = data.members
     .filter((member) => member.active)
-    .map((member) => ({
-      member,
-      count: tasks.filter(
-        ({ task, role }) =>
-          role !== "done" && role !== "backlog" && task.assigneeIds.includes(member.id),
-      ).length,
-    }))
-    .sort((a, b) => b.count - a.count || a.member.name.localeCompare(b.member.name, "tr"));
+    .map((member) => {
+      const assignedTasks = eligibleTasks.filter(({ task }) => task.assigneeIds.includes(member.id));
+      return {
+        member,
+        count: assignedTasks.length,
+        effortPoints: assignedTasks.reduce((total, { task }) => total + taskEffort(task), 0),
+      };
+    });
+  return sortMemberWorkload(workload, "tasks");
 }
 
 export function getWorkspaceInsights(data: AppData, today = new Date(), language: Language = "tr") {
